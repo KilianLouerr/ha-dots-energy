@@ -47,9 +47,55 @@ en twee gebruikers van hetzelfde token kunnen elkaar afmelden.
 | `sensor.dots_energy_gekozen_factuur` | de factuur gekozen in de keuzelijst, met alle regels |
 | `sensor.dots_energy_maandoverzicht` | bedragen per maand en categorie (voor grafieken) |
 | `sensor.dots_energy_laatst_bijgewerkt` | tijdstip van de laatste geslaagde synchronisatie |
+| `sensor.dots_energy_factuur_tot_nu_toe` | wat de factuur van deze maand nu al zou zijn, per categorie en per dag (zie Voorspelling) |
+| `sensor.dots_energy_verwachte_factuur` | verwachte factuur voor de hele maand, per categorie en per regel (zie Voorspelling) |
 | `select.dots_energy_factuur` | keuzelijst van alle facturen |
 | `event.dots_energy_nieuwe_factuur` | gebeurtenis bij een nieuwe factuur |
 
 De maandbedragen worden ook als externe statistieken `dots_energy:<categorie>` bewaard.
+
+## Voorspelling
+
+De integratie schat elk uur wat de factuur van de lopende maand wordt: wat ze **tot nu toe**
+zou zijn, en wat ze op het einde van de maand **verwacht** wordt. Het is een schatting, geen
+factuur.
+
+Hoe ze rekent:
+
+- De tarieven komen uit je laatste facturen: prijzen per kWh (accijns, certificaten,
+  evenwichtsbijdragen), vaste kosten per dag, btw.
+- Energie en injectie: je verbruik per uur maal de marktprijs van dat uur, plus een opslag die
+  geleerd wordt uit je vorige facturen. Zolang die opslag nog niet geleerd is, rekent ze met de
+  eenheidsprijs van je laatste factuur.
+- Netkosten: het gemiddelde van je maandpieken over de laatste 12 maanden (capaciteitstarief)
+  en je kWh, geleerd uit je facturen zodra er drie maanden met die gegevens zijn.
+- Flexibiliteitsvergoeding: per kWh die je batterijsturing verhandelde, geleerd uit je
+  facturen; zonder die gegevens het gemiddelde per dag.
+- De rest van de maand wordt ingevuld met je gemiddelde verbruik per dag van deze maand
+  (de eerste week gemengd met de vorige maand).
+
+Instellen: **Instellingen → Apparaten en diensten → Dots Energy → Configureren**. Kies sensoren
+met uurstatistieken (`state_class` `total` of `total_increasing`):
+
+| Optie | Nodig | Voorbeeld |
+|---|---|---|
+| Afname van het net (kWh) | ja | `sensor.my_grid_import` |
+| Injectie in het net (kWh) | nee | `sensor.my_grid_export` |
+| Gemiddelde maandpiek laatste 12 maanden (kW) | nee | `sensor.my_capacity_average` |
+| Door de batterijsturing verhandelde kWh | nee | `sensor.my_steered_charge`, `sensor.my_steered_discharge` |
+| Marktprijs per kWh (day-ahead) | nee | een sensor van een Nord Pool- of ENTSO-E-integratie |
+| Prijs is inclusief btw | nee | aan als de prijssensor btw bevat |
+
+De marktprijs wordt elk uur vastgelegd (een prijssensor bewaart zelf maar een paar dagen
+historiek). De opslag op de marktprijs kan dus pas geleerd worden na een volledige
+factuurmaand met vastgelegde prijzen.
+
+Ontbreekt er iets (prijs, meting, gegevens van de batterijsturing), dan blijft de voorspelling
+een getal tonen en staat het attribuut `kwaliteit` op `ruw`, met in `ontbreekt` wat er
+ontbrak.
+
+Gebouwd en getest voor een **dynamisch** contract in **Vlaanderen** (capaciteitstarief) met een
+enkelvoudige meter. In andere situaties vallen de regels terug op de prijzen van je laatste
+factuur.
 
 Voorbeelden van een dashboard en een melding staan in [`examples/`](examples/).
