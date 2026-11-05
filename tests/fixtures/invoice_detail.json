@@ -1,0 +1,31 @@
+{
+  "id": 102, "locationId": 7, "contractId": 70, "invoiceNumber": "TST00000102",
+  "invoiceDate": "2026-03-20", "dueDate": "2026-04-03",
+  "periodStart": "2026-02-01", "periodEnd": "2026-03-01",
+  "energyType": "electricity", "invoiceType": "out_invoice",
+  "totalAmount": 88.38, "taxAmount": 5.77, "netAmount": 82.61, "currency": "EUR",
+  "status": "pending", "consumption": null, "consumptionUnit": null,
+  "createdAt": "2026-03-19T10:00:00", "updatedAt": "2026-03-21T08:00:00",
+  "charges": [
+    {"id": 1, "invoiceId": 102, "category": "Energielevering elektriciteit", "description": "Elektriciteit totale uren", "quantity": 250.0, "unit": "Units", "unitPrice": 0.12, "amount": 30.0, "createdAt": "2026-03-19T10:00:00"},
+    {"id": 2, "invoiceId": 102, "category": "Nettarieven elektriciteit", "description": "Meet- en telactiviteit elektriciteit", "quantity": 1, "unit": "Units", "unitPrice": 1.5, "amount": 1.5, "createdAt": "2026-03-19T10:00:00"},
+    {"id": 3, "invoiceId": 102, "category": "Nettarieven elektriciteit", "description": "Transport en distributie elektriciteit", "quantity": 1, "unit": "Units", "unitPrice": 38.0, "amount": 38.0, "createdAt": "2026-03-19T10:00:00"},
+    {"id": 4, "invoiceId": 102, "category": "Energielevering elektriciteit", "description": "Groenestroomcertificaten", "quantity": 0.25, "unit": "Units", "unitPrice": 11.0, "amount": 2.75, "createdAt": "2026-03-19T10:00:00"},
+    {"id": 5, "invoiceId": 102, "category": "Energielevering elektriciteit", "description": "Warmtekrachtcertificaten", "quantity": 0.25, "unit": "Units", "unitPrice": 4.6, "amount": 1.15, "createdAt": "2026-03-19T10:00:00"},
+    {"id": 6, "invoiceId": 102, "category": "Toeslagen elektriciteit", "description": "Accijnzen elektriciteit", "quantity": 250.0, "unit": "Units", "unitPrice": 0, "amount": 0, "createdAt": "2026-03-19T10:00:00"},
+    {"id": 7, "invoiceId": 102, "category": "Toeslagen elektriciteit", "description": "Bijzondere accijns elektriciteit", "quantity": 250.0, "unit": "Units", "unitPrice": 0.046, "amount": 11.5, "createdAt": "2026-03-19T10:00:00"},
+    {"id": 8, "invoiceId": 102, "category": "Toeslagen elektriciteit", "description": "Vlaamse energieheffing elektriciteit", "quantity": 0.083, "unit": "Units", "unitPrice": 0, "amount": 0, "createdAt": "2026-03-19T10:00:00"},
+    {"id": 9, "invoiceId": 102, "category": "Energielevering elektriciteit", "description": "Evenwichtsbijdrage injectie", "quantity": 100.0, "unit": "Units", "unitPrice": 0.005, "amount": 0.5, "createdAt": "2026-03-19T10:00:00"},
+    {"id": 10, "invoiceId": 102, "category": "Energielevering elektriciteit", "description": "Vaste vergoeding elektriciteit", "quantity": 0.083, "unit": "Units", "unitPrice": 120, "amount": 9.96, "createdAt": "2026-03-19T10:00:00"},
+    {"id": 11, "invoiceId": 102, "category": "Energielevering elektriciteit", "description": "Evenwichtsbijdrage afname", "quantity": 250.0, "unit": "Units", "unitPrice": 0.005, "amount": 1.25, "createdAt": "2026-03-19T10:00:00"}
+  ],
+  "discounts": [
+    {"id": 12, "invoiceId": 102, "description": "Flexibiliteitsvergoeding", "discountType": "fixed", "discountValue": 4.0, "amount": -4.0, "createdAt": "2026-03-19T10:00:00"},
+    {"id": 13, "invoiceId": 102, "description": "Settlement injectie totale uren", "discountType": "fixed", "discountValue": 0.1, "amount": -10.0, "createdAt": "2026-03-19T10:00:00"},
+    {"id": 14, "invoiceId": 102, "description": "Afrondingsverschil negatief", "discountType": "fixed", "discountValue": 0.01, "amount": -0.01, "createdAt": "2026-03-19T10:00:00"}
+  ],
+  "taxes": [
+    {"id": 15, "invoiceId": 102, "taxType": "6%", "taxRate": 6, "taxableAmount": 96.11, "taxAmount": 5.77, "createdAt": "2026-03-19T10:00:00"}
+  ],
+  "payment": {"id": 16, "invoiceId": 102, "bankName": "Testbank", "bic": "TESTBEBB", "iban": "BE00 0000 0000 0000", "paidAmount": 0, "paidAt": null, "paymentMethod": "SEPA Direct Debit", "paymentReference": "+++000/0000/00000+++", "createdAt": "2026-03-19T10:00:00"}
+}
