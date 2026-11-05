@@ -142,7 +142,8 @@ def _basis(line: InvoiceLine) -> Basis | None:
     return "day"
 
 
-def _injection_kwh(detail: InvoiceDetail) -> Decimal | None:
+def injection_kwh(detail: InvoiceDetail) -> Decimal | None:
+    """kWh injected, from the "Evenwichtsbijdrage injectie" charge."""
     for line in detail.lines:
         if line.kind == "charge" and line.description.lower().startswith(
             "evenwichtsbijdrage injectie"
@@ -192,7 +193,7 @@ def derive_rules(
             elif basis == "transport":
                 transport_per_day = line.amount / days
             elif basis == "injection":
-                kwh = _injection_kwh(detail)
+                kwh = injection_kwh(detail)
                 injection_price = abs(line.amount) / kwh if kwh else line.unit_price
             rules[key] = Rule(
                 description=line.description,
