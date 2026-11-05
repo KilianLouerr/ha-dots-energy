@@ -39,6 +39,15 @@
         "data": {
           "location_id": "Adres"
         }
+      },
+      "login_unknown": {
+        "title": "Onverwacht antwoord van Dots",
+        "description": "Dots antwoordde bij het aanmelden op een manier die Home Assistant niet herkent (de loginpagina is misschien veranderd). Gebruik een refresh token, of probeer het later opnieuw.",
+        "menu_options": {
+          "refresh_token": "Refresh token gebruiken",
+          "user": "Opnieuw proberen met e-mail en wachtwoord",
+          "reauth_confirm": "Opnieuw proberen met e-mail en wachtwoord"
+        }
       }
     },
     "error": {

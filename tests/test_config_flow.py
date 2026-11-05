@@ -249,3 +249,48 @@ async def test_reauth_with_other_account_aborts(hass, aioclient_mock) -> None:
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "wrong_account"
     assert entry.data[CONF_PASSWORD] == "old"
+
+
+async def test_unknown_login_response_offers_refresh_token_route(hass, aioclient_mock) -> None:
+    """If Dots changes its login pages, the token route must still be reachable."""
+    aioclient_mock.get(
+        AUTHORIZE_RE, status=302, headers={"Location": "/u/login/identifier?state=ST9"}
+    )
+    aioclient_mock.get(
+        "https://auth.dotsenergy.be/u/login/identifier?state=ST9",
+        text="<form>new page</form>",
+        headers={"Content-Type": "text/html"},
+    )
+
+    result = await _start(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_EMAIL: EMAIL, CONF_PASSWORD: PASSWORD}
+    )
+
+    assert result["type"] is FlowResultType.MENU
+    assert result["step_id"] == "login_unknown"
+    assert result["menu_options"] == ["refresh_token", "user"]
+
+
+async def test_reauth_unknown_response_offers_refresh_token_route(hass, aioclient_mock) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="auth0|user-1",
+        data={
+            CONF_EMAIL: EMAIL,
+            CONF_PASSWORD: "old",
+            CONF_REFRESH_TOKEN: "RT-old",
+            CONF_LOCATION_ID: 7,
+        },
+    )
+    entry.add_to_hass(hass)
+    aioclient_mock.get(AUTHORIZE_RE, status=302, headers={"Location": "/somewhere-new"})
+    aioclient_mock.get("https://auth.dotsenergy.be/somewhere-new", text="<html></html>")
+
+    result = await entry.start_reauth_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_EMAIL: EMAIL, CONF_PASSWORD: PASSWORD}
+    )
+
+    assert result["type"] is FlowResultType.MENU
+    assert result["menu_options"] == ["refresh_token", "reauth_confirm"]

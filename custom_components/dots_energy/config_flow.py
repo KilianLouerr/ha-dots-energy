@@ -94,7 +94,7 @@ class DotsConfigFlow(ConfigFlow, domain=DOMAIN):
             errors["base"] = "cannot_connect"
         except AuthError as err:
             _LOGGER.warning("Unexpected Dots login response: %s", err)
-            errors["base"] = "unknown"
+            return await self.async_step_login_unknown()
         else:
             return await self._async_finish()
         return self.async_show_form(
@@ -107,10 +107,17 @@ class DotsConfigFlow(ConfigFlow, domain=DOMAIN):
             return await self._async_try_password(user_input, "user")
         return self.async_show_form(step_id="user", data_schema=_credentials_schema())
 
+    def _fallback_menu(self, step_id: str) -> ConfigFlowResult:
+        back = "reauth_confirm" if self.source == SOURCE_REAUTH else "user"
+        return self.async_show_menu(step_id=step_id, menu_options=["refresh_token", back])
+
     async def async_step_captcha(self, user_input: None = None) -> ConfigFlowResult:
         """Dots asks for a captcha: offer the refresh-token route."""
-        back = "reauth_confirm" if self.source == SOURCE_REAUTH else "user"
-        return self.async_show_menu(step_id="captcha", menu_options=["refresh_token", back])
+        return self._fallback_menu("captcha")
+
+    async def async_step_login_unknown(self, user_input: None = None) -> ConfigFlowResult:
+        """Dots answered the login unexpectedly: offer the refresh-token route."""
+        return self._fallback_menu("login_unknown")
 
     async def async_step_refresh_token(
         self, user_input: dict[str, Any] | None = None

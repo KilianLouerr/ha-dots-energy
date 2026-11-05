@@ -39,6 +39,15 @@
         "data": {
           "location_id": "Address"
         }
+      },
+      "login_unknown": {
+        "title": "Unexpected answer from Dots",
+        "description": "Dots answered the sign-in in a way Home Assistant does not recognise (its login page may have changed). Use a refresh token instead, or try again later.",
+        "menu_options": {
+          "refresh_token": "Use a refresh token",
+          "user": "Try e-mail and password again",
+          "reauth_confirm": "Try e-mail and password again"
+        }
       }
     },
     "error": {
