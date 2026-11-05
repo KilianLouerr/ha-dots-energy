@@ -57,6 +57,7 @@ def _line(kind, description, api_category=None, amount="1"):
         (_line("discount", "Settlement injectie totale uren"), Category.INJECTIE),
         (_line("discount", "Afrondingsverschil negatief"), None),
         (_line("discount", "Afrondingsverschil positief"), None),
+        (_line("charge", "Afrondingsverschil positief", "Diversen"), None),
         (_line("discount", "Flexibiliteitsvergoeding"), Category.VERGOEDINGEN),
         (
             _line("charge", "Vaste vergoeding elektriciteit", "Energielevering elektriciteit"),

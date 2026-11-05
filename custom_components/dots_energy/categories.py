@@ -37,11 +37,11 @@ def categorize_line(line: InvoiceLine) -> Category | None:
     description = line.description.lower()
     if line.kind == "tax":
         return Category.BTW
+    if description.startswith("afrondingsverschil"):
+        return None
     if line.kind == "discount":
         if description.startswith("settlement injectie"):
             return Category.INJECTIE
-        if description.startswith("afrondingsverschil"):
-            return None
         return Category.VERGOEDINGEN
     if "vaste vergoeding" in description:
         return Category.VASTE_KOSTEN
