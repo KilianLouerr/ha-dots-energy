@@ -37,7 +37,11 @@ def redirect(method: str, url: Any, location: str) -> AiohttpClientMockResponse:
 
 def token_payload(access: str, refresh: str | None, expires_in: int = 86400) -> dict:
     """Build an Auth0 token response body."""
-    body: dict[str, Any] = {"access_token": access, "expires_in": expires_in, "token_type": "Bearer"}
+    body: dict[str, Any] = {
+        "access_token": access,
+        "expires_in": expires_in,
+        "token_type": "Bearer",
+    }
     if refresh:
         body["refresh_token"] = refresh
     return body

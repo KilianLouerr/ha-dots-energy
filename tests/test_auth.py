@@ -68,7 +68,9 @@ async def make_auth(aioclient_mock):
 
 
 def _posts(aioclient_mock, url: str) -> int:
-    return sum(1 for m, u, _, _ in aioclient_mock.mock_calls if m.lower() == "post" and str(u) == url)
+    return sum(
+        1 for m, u, _, _ in aioclient_mock.mock_calls if m.lower() == "post" and str(u) == url
+    )
 
 
 async def test_login_happy_path(aioclient_mock, make_auth) -> None:

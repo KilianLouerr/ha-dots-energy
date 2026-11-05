@@ -14,7 +14,11 @@ from custom_components.dots_energy.categories import (
     categorize_line,
 )
 from custom_components.dots_energy.const import Category
-from custom_components.dots_energy.models import InvoiceLine, parse_invoice_detail, parse_invoice_list
+from custom_components.dots_energy.models import (
+    InvoiceLine,
+    parse_invoice_detail,
+    parse_invoice_list,
+)
 
 from .conftest import load_fixture
 
@@ -54,10 +58,22 @@ def _line(kind, description, api_category=None, amount="1"):
         (_line("discount", "Afrondingsverschil negatief"), None),
         (_line("discount", "Afrondingsverschil positief"), None),
         (_line("discount", "Flexibiliteitsvergoeding"), Category.VERGOEDINGEN),
-        (_line("charge", "Vaste vergoeding elektriciteit", "Energielevering elektriciteit"), Category.VASTE_KOSTEN),
-        (_line("charge", "Transport en distributie elektriciteit", "Nettarieven elektriciteit"), Category.NETKOSTEN),
-        (_line("charge", "Bijzondere accijns elektriciteit", "Toeslagen elektriciteit"), Category.HEFFINGEN),
-        (_line("charge", "Groenestroomcertificaten", "Energielevering elektriciteit"), Category.ENERGIE),
+        (
+            _line("charge", "Vaste vergoeding elektriciteit", "Energielevering elektriciteit"),
+            Category.VASTE_KOSTEN,
+        ),
+        (
+            _line("charge", "Transport en distributie elektriciteit", "Nettarieven elektriciteit"),
+            Category.NETKOSTEN,
+        ),
+        (
+            _line("charge", "Bijzondere accijns elektriciteit", "Toeslagen elektriciteit"),
+            Category.HEFFINGEN,
+        ),
+        (
+            _line("charge", "Groenestroomcertificaten", "Energielevering elektriciteit"),
+            Category.ENERGIE,
+        ),
         (_line("charge", "Iets nieuws", "Nieuwe categorie"), Category.OVERIG),
     ],
 )

@@ -50,7 +50,7 @@ def subject_from_token(access_token: str) -> str | None:
         payload = access_token.split(".")[1]
         payload += "=" * (-len(payload) % 4)
         return json.loads(base64.urlsafe_b64decode(payload)).get("sub")
-    except (IndexError, ValueError, AttributeError):
+    except IndexError, ValueError, AttributeError:
         return None
 
 
@@ -161,7 +161,7 @@ class DotsConfigFlow(ConfigFlow, domain=DOMAIN):
         api = DotsApiClient(async_get_clientsession(self.hass), self._auth)
         try:
             self._locations = await api.async_get_locations()
-        except (ApiError, AuthError):
+        except ApiError, AuthError:
             return self.async_abort(reason="cannot_connect")
         if not self._locations:
             return self.async_abort(reason="no_locations")

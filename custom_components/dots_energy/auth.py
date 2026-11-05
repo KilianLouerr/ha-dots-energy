@@ -211,7 +211,9 @@ class DotsAuth:
         )
         try:
             async with self._login_session_factory() as login_session:
-                login_url = await self._async_follow(login_session, authorize_url, stop_at_login=True)
+                login_url = await self._async_follow(
+                    login_session, authorize_url, stop_at_login=True
+                )
                 async with login_session.get(login_url, allow_redirects=False) as resp:
                     if resp.status >= 500:
                         raise CannotConnect(f"Login page returned HTTP {resp.status}")

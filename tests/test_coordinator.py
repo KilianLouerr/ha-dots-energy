@@ -11,7 +11,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_capture_events
 
 from custom_components.dots_energy.api import ApiAuthError, ApiError
-from custom_components.dots_energy.auth import CaptchaRequired, CannotConnect
+from custom_components.dots_energy.auth import CannotConnect, CaptchaRequired
 from custom_components.dots_energy.const import DOMAIN, EVENT_NEW_INVOICE, Category
 from custom_components.dots_energy.coordinator import DotsCoordinator
 

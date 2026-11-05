@@ -14,7 +14,15 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.dots_energy.const import CONF_LOCATION_ID, CONF_REFRESH_TOKEN, DOMAIN
 
-from .auth_mocks import AUTHORIZE_RE, CAPTCHA_HTML, LOGIN, LOGIN_HTML, TOKEN, mock_login, token_payload
+from .auth_mocks import (
+    AUTHORIZE_RE,
+    CAPTCHA_HTML,
+    LOGIN,
+    LOGIN_HTML,
+    TOKEN,
+    mock_login,
+    token_payload,
+)
 
 API = "https://api.dotsenergy.be"
 EMAIL = "someone@example.invalid"
@@ -37,7 +45,9 @@ def bypass_setup():
 
 
 def _locations(aioclient_mock, *locations) -> None:
-    aioclient_mock.get(f"{API}/v1/my/locations", json=list(locations) or [{"id": 7, "name": "Thuis"}])
+    aioclient_mock.get(
+        f"{API}/v1/my/locations", json=list(locations) or [{"id": 7, "name": "Thuis"}]
+    )
 
 
 def _login_page(aioclient_mock, html=LOGIN_HTML) -> None:
@@ -191,7 +201,12 @@ async def test_reauth_updates_entry(hass, aioclient_mock) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id="auth0|user-1",
-        data={CONF_EMAIL: EMAIL, CONF_PASSWORD: "old", CONF_REFRESH_TOKEN: "RT-old", CONF_LOCATION_ID: 7},
+        data={
+            CONF_EMAIL: EMAIL,
+            CONF_PASSWORD: "old",
+            CONF_REFRESH_TOKEN: "RT-old",
+            CONF_LOCATION_ID: 7,
+        },
     )
     entry.add_to_hass(hass)
     mock_login(aioclient_mock, access=jwt("auth0|user-1"), refresh="RT-new")
@@ -216,7 +231,12 @@ async def test_reauth_with_other_account_aborts(hass, aioclient_mock) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id="auth0|user-1",
-        data={CONF_EMAIL: EMAIL, CONF_PASSWORD: "old", CONF_REFRESH_TOKEN: "RT-old", CONF_LOCATION_ID: 7},
+        data={
+            CONF_EMAIL: EMAIL,
+            CONF_PASSWORD: "old",
+            CONF_REFRESH_TOKEN: "RT-old",
+            CONF_LOCATION_ID: 7,
+        },
     )
     entry.add_to_hass(hass)
     mock_login(aioclient_mock, access=jwt("auth0|someone-else"))

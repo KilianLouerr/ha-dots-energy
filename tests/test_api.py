@@ -20,7 +20,9 @@ API = "https://api.dotsenergy.be"
 @pytest.fixture
 async def client(aioclient_mock):
     session = aioclient_mock.create_session(asyncio.get_running_loop())
-    auth = DotsAuth(session, email=None, password=None, refresh_token="RT", on_tokens=lambda t: None)
+    auth = DotsAuth(
+        session, email=None, password=None, refresh_token="RT", on_tokens=lambda t: None
+    )
     yield DotsApiClient(session, auth)
     await session.close()
 
@@ -70,7 +72,15 @@ async def test_get_locations_keeps_id_and_name_only(aioclient_mock, client) -> N
     aioclient_mock.post(TOKEN, json=token_payload("AT-1", "RT-1"))
     aioclient_mock.get(
         f"{API}/v1/my/locations",
-        json=[{"id": 7, "name": "Thuis", "street": "Teststraat", "houseNumber": "1", "ean": "541000000000000000"}],
+        json=[
+            {
+                "id": 7,
+                "name": "Thuis",
+                "street": "Teststraat",
+                "houseNumber": "1",
+                "ean": "541000000000000000",
+            }
+        ],
     )
 
     assert await client.async_get_locations() == [{"id": 7, "name": "Thuis"}]
@@ -86,7 +96,9 @@ async def test_401_triggers_one_refresh_and_retry(aioclient_mock, client) -> Non
     )
     aioclient_mock.get(
         f"{API}/v1/my/locations/7/invoices",
-        side_effect=sequence({"status": 401, "json": {}}, {"json": load_fixture("invoice_list.json")}),
+        side_effect=sequence(
+            {"status": 401, "json": {}}, {"json": load_fixture("invoice_list.json")}
+        ),
     )
 
     invoices = await client.async_get_invoices(7)

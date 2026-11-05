@@ -100,9 +100,7 @@ def monthly_overview(
     """Amounts per month of periodStart and category, summed over all documents."""
     months: dict[date, dict[Category, Decimal]] = {}
     for summary in summaries:
-        amounts = months.setdefault(
-            _month(summary.period_start), {c: Decimal(0) for c in Category}
-        )
+        amounts = months.setdefault(_month(summary.period_start), {c: Decimal(0) for c in Category})
         for category, amount in _breakdown_for(summary, details).amounts.items():
             amounts[category] += amount
     result: list[dict[str, Any]] = []
