@@ -178,3 +178,43 @@ async def test_diagnostics_redacts_secrets(hass, entry) -> None:
         assert secret not in dumped
     assert diagnostics["data"]["invoices"][0]["index"] == 0
     assert diagnostics["data"]["kpis"]["outstanding"] == 88.38
+
+
+async def test_invoice_detected_during_setup_reaches_event_entity(
+    hass, aioclient_mock, freezer, hass_storage
+) -> None:
+    """An invoice that appeared while HA was down must still notify after start."""
+    from pytest_homeassistant_custom_component.common import async_capture_events
+
+    from custom_components.dots_energy.const import EVENT_NEW_INVOICE
+
+    freezer.move_to("2026-03-30 12:00:00+02:00")
+    _mock_api(aioclient_mock)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="auth0|user-1",
+        entry_id="restarted",
+        data={
+            CONF_EMAIL: EMAIL,
+            CONF_PASSWORD: PASSWORD,
+            CONF_REFRESH_TOKEN: "RT-0",
+            CONF_LOCATION_ID: 7,
+        },
+    )
+    hass_storage[f"{DOMAIN}.restarted"] = {
+        "version": 1,
+        "minor_version": 1,
+        "key": f"{DOMAIN}.restarted",
+        "data": {"synced": True, "known_ids": [101, 102], "details": {}, "updated_at": {}},
+    }
+    events = async_capture_events(hass, EVENT_NEW_INVOICE)
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert len(events) == 1
+    assert events[0].data["invoice_number"] == "TST00000103"
+    state = hass.states.get("event.dots_energy_nieuwe_factuur")
+    assert state.attributes.get("event_type") == "nieuwe_factuur"
+    assert state.attributes["invoice_number"] == "TST00000103"

@@ -34,6 +34,7 @@ def entry(hass):
 async def _coordinator(hass, entry, api) -> DotsCoordinator:
     coordinator = DotsCoordinator(hass, entry, api, 7)
     await coordinator.async_refresh()
+    coordinator.async_enable_event_delivery()
     return coordinator
 
 
@@ -92,6 +93,7 @@ async def test_restart_does_not_refire(hass, entry) -> None:
 
     second = DotsCoordinator(hass, entry, api, 7)
     await second.async_refresh()
+    second.async_enable_event_delivery()
     await hass.async_block_till_done()
 
     assert events == []

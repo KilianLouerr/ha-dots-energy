@@ -8,9 +8,10 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -78,7 +79,34 @@ class DotsCoordinator(DataUpdateCoordinator[DotsData]):
         )
         self._stored: dict[str, Any] | None = None
         self._contract: dict[str, Any] = {}
+        self._deliver_events = False
+        self._queued_events: list[dict[str, Any]] = []
         self.selected_invoice_id: int | None = None
+
+    @callback
+    def async_enable_event_delivery(self) -> CALLBACK_TYPE:
+        """Deliver new-invoice events once entities exist and HA has started.
+
+        Events found during the first refresh (inside setup) are queued so the
+        event entity and automations, which attach at start, still receive them.
+        """
+
+        @callback
+        def _start(hass: HomeAssistant) -> None:
+            self._deliver_events = True
+            queued, self._queued_events = self._queued_events, []
+            for payload in queued:
+                self._emit(payload)
+
+        return async_at_started(self.hass, _start)
+
+    @callback
+    def _emit(self, payload: dict[str, Any]) -> None:
+        if not self._deliver_events:
+            self._queued_events.append(payload)
+            return
+        self.hass.bus.async_fire(EVENT_NEW_INVOICE, payload)
+        async_dispatcher_send(self.hass, new_invoice_signal(self.config_entry.entry_id), payload)
 
     async def _async_load_store(self) -> dict[str, Any]:
         if self._stored is None:
@@ -202,9 +230,6 @@ class DotsCoordinator(DataUpdateCoordinator[DotsData]):
                     "previous_amount": float(previous.total) if previous else None,
                     "difference": float(summary.total - previous.total) if previous else None,
                 }
-                self.hass.bus.async_fire(EVENT_NEW_INVOICE, payload)
-                async_dispatcher_send(
-                    self.hass, new_invoice_signal(self.config_entry.entry_id), payload
-                )
+                self._emit(payload)
         stored["known_ids"] = sorted(known | {s.id for s in summaries})
         stored["synced"] = True
