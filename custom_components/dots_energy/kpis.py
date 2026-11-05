@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
@@ -12,7 +13,26 @@ from .categories import Breakdown, breakdown, breakdown_from_summary
 from .const import Category
 from .models import InvoiceDetail, InvoiceSummary
 
+_LOGGER = logging.getLogger(__name__)
+
 _AFNAME_LINE = "elektriciteit totale uren"
+KNOWN_STATUSES = frozenset({"paid", "pending"})
+KNOWN_TYPES = frozenset({"out_invoice", "out_refund"})
+_warned: set[tuple[str, str]] = set()
+
+
+def _warn_unknown(summaries: Iterable[InvoiceSummary]) -> None:
+    """Log each unknown status or document type once (value only)."""
+    for summary in summaries:
+        for kind, value, known in (
+            ("status", summary.status, KNOWN_STATUSES),
+            ("documenttype", summary.invoice_type, KNOWN_TYPES),
+        ):
+            if value not in known and (kind, value) not in _warned:
+                _warned.add((kind, value))
+                _LOGGER.warning(
+                    "Onbekende Dots-factuur%s '%s'; verwerkt als gewone waarde", kind, value
+                )
 
 
 @dataclass(frozen=True)
@@ -68,6 +88,7 @@ def compute_kpis(
     summaries: list[InvoiceSummary], details: dict[int, InvoiceDetail], today: date
 ) -> Kpis:
     """Compute the headline figures as defined in the design."""
+    _warn_unknown(summaries)
     last = last_invoice(summaries)
     total_this_year = sum(
         (s.total for s in summaries if s.period_start.year == today.year), Decimal(0)

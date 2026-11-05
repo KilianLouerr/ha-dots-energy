@@ -79,3 +79,15 @@ def test_credit_note_subtracts_in_same_month() -> None:
     assert feb["injectie"] == -10.0
     assert feb["overig"] == -12.5
     assert round(sum(v for k, v in feb.items() if k not in ("maand", "totaal")), 2) == 75.88
+
+
+def test_kpis_warn_once_for_unknown_status_and_type(caplog) -> None:
+    summaries, details = _data()
+    summaries[0] = dataclasses.replace(summaries[0], status="overdue", invoice_type="deposit")
+
+    compute_kpis(summaries, details, today=date(2026, 3, 30))
+    compute_kpis(summaries, details, today=date(2026, 3, 30))
+
+    assert caplog.text.count("overdue") == 1
+    assert caplog.text.count("deposit") == 1
+    assert "TST0000" not in caplog.text
