@@ -1,5 +1,6 @@
 # Dashboard 'Facturen' voor de Dots Energy-integratie.
-# Vereist apexcharts-card (HACS). Plak dit in een nieuw dashboard via 'Ruwe configuratie-editor'.
+# Vereist button-card (HACS). Maak een nieuw dashboard en plak dit via 'Ruwe configuratie-editor'.
+# Tik op een maand in de grafiek of op een factuur in de lijst om haar regels te tonen.
 views:
 - title: Facturen
   path: facturen
@@ -10,220 +11,179 @@ views:
   - type: grid
     column_span: 2
     cards:
-    - type: heading
-      heading: Facturen
-      heading_style: title
-      icon: mdi:receipt-text
-      badges:
-      - type: entity
-        entity: sensor.dots_energy_laatst_bijgewerkt
-        show_state: true
-        show_icon: true
-        icon: mdi:cloud-check-outline
-        color: green
-        tap_action:
-          action: more-info
-        visibility:
-        - condition: template
-          value_template: '{{ has_value(''sensor.dots_energy_laatst_bijgewerkt'') and now() - as_datetime(states(''sensor.dots_energy_laatst_bijgewerkt'')) < timedelta(hours=24) }}'
-      - type: entity
-        entity: sensor.dots_energy_laatst_bijgewerkt
-        show_state: true
-        show_icon: true
-        icon: mdi:cloud-alert-outline
-        color: orange
-        tap_action:
-          action: more-info
-        visibility:
-        - condition: template
-          value_template: '{{ not has_value(''sensor.dots_energy_laatst_bijgewerkt'') or now() - as_datetime(states(''sensor.dots_energy_laatst_bijgewerkt'')) >= timedelta(hours=24) }}'
-    - type: tile
+    - type: custom:button-card
       entity: sensor.dots_energy_laatste_factuur
-      name: Laatste factuur
-      icon: mdi:receipt-text-outline
-      color: deep-purple
+      show_name: false
+      show_icon: false
+      show_state: false
+      tap_action:
+        action: more-info
       grid_options:
         columns: 6
-    - type: tile
+        rows: auto
+      custom_fields:
+        l: Laatste factuur
+        v: '[[[ const n = Number(entity.state); return isNaN(n) ? ''–'' : ''€ '' + n.toLocaleString(''nl-BE'', {minimumFractionDigits: 2, maximumFractionDigits: 2}); ]]]'
+        s: '[[[ const a = entity.attributes, M = [''jan'',''feb'',''mrt'',''apr'',''mei'',''jun'',''jul'',''aug'',''sep'',''okt'',''nov'',''dec'']; const p = (a.periode_start || '''').split(''-''); const m = p.length > 1 ? M[+p[1] - 1] : ''''; const st = a.status === ''paid'' ? ''betaald'' : a.status === ''pending'' ? ''in behandeling'' : (a.status || ''''); const c = a.status === ''paid'' ? ''var(--secondary-text-color)'' : ''#f0a030''; return `<span style=''color:${c}''>${m} · ${st}</span>`; ]]]'
+      styles: &id001
+        card:
+        - padding: 14px 18px
+        grid:
+        - grid-template-areas: '"l" "v" "s"'
+        - grid-template-columns: 1fr
+        - justify-items: start
+        - row-gap: 2px
+        custom_fields:
+          l:
+          - font-size: 13px
+          - color: var(--secondary-text-color)
+          v:
+          - font-size: 26px
+          - font-weight: '500'
+          - line-height: '1.25'
+          - color: var(--primary-text-color)
+          s:
+          - font-size: 12px
+          - color: var(--secondary-text-color)
+    - type: custom:button-card
       entity: sensor.dots_energy_totaal_dit_jaar
-      name: Totaal dit jaar
-      icon: mdi:calendar-range
-      color: blue
+      show_name: false
+      show_icon: false
+      show_state: false
+      tap_action:
+        action: more-info
+      triggers_update:
+      - sensor.dots_energy_maandoverzicht
       grid_options:
         columns: 6
-    - type: tile
+        rows: auto
+      custom_fields:
+        l: '[[[ return ''Totaal '' + new Date().getFullYear(); ]]]'
+        v: '[[[ const n = Number(entity.state); return isNaN(n) ? ''–'' : ''€ '' + n.toLocaleString(''nl-BE'', {minimumFractionDigits: 2, maximumFractionDigits: 2}); ]]]'
+        s: '[[[ const y = String(new Date().getFullYear()); const fs = states[''sensor.dots_energy_maandoverzicht'']?.attributes?.facturen || []; const n = fs.filter(f => f.periode.startsWith(y)).length; return n + (n === 1 ? '' factuur'' : '' facturen''); ]]]'
+      styles: *id001
+    - type: custom:button-card
       entity: sensor.dots_energy_gemiddeld_per_maand
-      name: Gemiddeld per maand
-      icon: mdi:chart-bell-curve-cumulative
-      color: teal
+      show_name: false
+      show_icon: false
+      show_state: false
+      tap_action:
+        action: more-info
+      triggers_update:
+      - sensor.dots_energy_maandoverzicht
       grid_options:
         columns: 6
-    - type: tile
+        rows: auto
+      custom_fields:
+        l: Gemiddeld / maand
+        v: '[[[ const n = Number(entity.state); return isNaN(n) ? ''–'' : ''€ '' + n.toLocaleString(''nl-BE'', {minimumFractionDigits: 2, maximumFractionDigits: 2}); ]]]'
+        s: '[[[ const M = [''jan'',''feb'',''mrt'',''apr'',''mei'',''jun'',''jul'',''aug'',''sep'',''okt'',''nov'',''dec'']; const ms = (states[''sensor.dots_energy_maandoverzicht'']?.attributes?.maanden || []).slice(-12); if (!ms.length) return ''''; const f = m => M[+m.maand.split(''-'')[1] - 1]; return ms.length === 1 ? f(ms[0]) : f(ms[0]) + '' – '' + f(ms[ms.length - 1]); ]]]'
+      styles: *id001
+    - type: custom:button-card
       entity: sensor.dots_energy_all_in_prijs
-      name: All-in per kWh
-      icon: mdi:flash
-      color: amber
+      show_name: false
+      show_icon: false
+      show_state: false
+      tap_action:
+        action: more-info
+      triggers_update:
+      - sensor.dots_energy_laatste_factuur
       grid_options:
         columns: 6
-    - type: custom:apexcharts-card
+        rows: auto
+      custom_fields:
+        l: All-in per kWh
+        v: '[[[ const n = Number(entity.state); return isNaN(n) ? ''–'' : ''€ '' + n.toLocaleString(''nl-BE'', {minimumFractionDigits: 2, maximumFractionDigits: 2}); ]]]'
+        s: '[[[ const M = [''januari'',''februari'',''maart'',''april'',''mei'',''juni'',''juli'',''augustus'',''september'',''oktober'',''november'',''december'']; const p = (states[''sensor.dots_energy_laatste_factuur'']?.attributes?.periode_start || '''').split(''-''); return p.length > 1 ? M[+p[1] - 1] : ''''; ]]]'
+      styles: *id001
+    - type: custom:button-card
+      entity: sensor.dots_energy_maandoverzicht
+      show_name: false
+      show_icon: false
+      show_state: false
+      tap_action:
+        action: none
+      hold_action:
+        action: none
+      triggers_update:
+      - select.dots_energy_factuur
       grid_options:
         columns: full
         rows: auto
-      graph_span: 9month
-      span:
-        end: month
-      stacked: true
-      header:
-        show: true
-        title: Kost per maand
-        show_states: false
-      apex_config:
-        chart:
-          height: 340
-          width: 100%
-          redrawOnParentResize: true
-        plotOptions:
-          bar:
-            columnWidth: 55%
-            borderRadius: 2
-        legend:
-          show: true
-          position: bottom
-          horizontalAlign: center
-          clusterGroupedSeries: false
-        xaxis:
-          labels:
-            format: MMM
-        tooltip:
-          shared: true
-          intersect: false
-        dataLabels:
-          enabled: false
-        markers:
-          size:
-          - 0
-          - 0
-          - 0
-          - 0
-          - 0
-          - 0
-          - 0
-          - 0
-          - 3
-        yaxis:
-          forceNiceScale: true
-          labels:
-            formatter: EVAL:(v) => '€ ' + Math.round(v)
-      all_series_config:
-        type: column
-        show:
-          legend_value: false
-          in_header: false
-      series:
-      - entity: sensor.dots_energy_maandoverzicht
-        name: Energie
-        color: '#7F77DD'
-        stack_group: kost
-        extend_to: false
-        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.energie]);
-      - entity: sensor.dots_energy_maandoverzicht
-        name: Netkosten
-        color: '#1D9E75'
-        stack_group: kost
-        extend_to: false
-        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.netkosten]);
-      - entity: sensor.dots_energy_maandoverzicht
-        name: Heffingen
-        color: '#D4537E'
-        stack_group: kost
-        extend_to: false
-        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.heffingen]);
-      - entity: sensor.dots_energy_maandoverzicht
-        name: Vaste kosten
-        color: '#888780'
-        stack_group: kost
-        extend_to: false
-        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.vaste_kosten]);
-      - entity: sensor.dots_energy_maandoverzicht
-        name: Btw
-        color: '#EF9F27'
-        stack_group: kost
-        extend_to: false
-        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.btw]);
-      - entity: sensor.dots_energy_maandoverzicht
-        name: Injectie
-        color: '#378ADD'
-        stack_group: kost
-        extend_to: false
-        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.injectie]);
-      - entity: sensor.dots_energy_maandoverzicht
-        name: Vergoedingen
-        color: '#5DCAA5'
-        stack_group: kost
-        extend_to: false
-        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.vergoedingen]);
-      - entity: sensor.dots_energy_maandoverzicht
-        name: Overig
-        color: '#B4B2A9'
-        stack_group: kost
-        extend_to: false
-        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.overig]);
-      - entity: sensor.dots_energy_maandoverzicht
-        name: Totaal
-        type: line
-        color: '#5F5E5A'
-        stroke_width: 2
-        curve: straight
-        extend_to: false
-        show:
-          in_chart: true
-        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.totaal]);
-  - type: grid
-    cards:
-    - type: heading
-      heading: Factuur in detail
-      heading_style: title
-      icon: mdi:file-document-outline
-    - type: tile
-      entity: select.dots_energy_factuur
-      name: Kies een factuur
-      icon: mdi:file-search-outline
-      color: deep-purple
-      hide_state: true
-      features:
-      - type: select-options
+      custom_fields:
+        c: '[[[ const ms = entity.attributes.maanden || []; const fs = entity.attributes.facturen || []; const sel = states[''select.dots_energy_factuur'']?.state; const M = [''jan'',''feb'',''mrt'',''apr'',''mei'',''jun'',''jul'',''aug'',''sep'',''okt'',''nov'',''dec'']; const POS = [[''energie'',''Energie'',''#7F77DD''],[''netkosten'',''Netkosten'',''#1D9E75''],[''heffingen'',''Heffingen'',''#D4537E''],[''vaste_kosten'',''Vaste kosten'',''#888780''],[''btw'',''Btw'',''#EF9F27'']]; const NEG = [[''injectie'',''Injectie'',''#378ADD''],[''vergoedingen'',''Vergoedingen'',''#5DCAA5'']]; const OV = [''overig'',''Overig'',''#B4B2A9'']; const eur = v => { const n = Number(v); return (n < 0 ? ''€ −'' : ''€ '') + Math.abs(n).toLocaleString(''nl-BE'', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }; if (!ms.length) return html`<div class=''title''>Kost per maand, per categorie</div><div class=''empty''>Nog geen facturen</div>`; const cats = [...POS, OV, ...NEG]; let hi = 0, lo = 0; for (const m of ms) { let p = 0, q = 0; for (const [k] of cats) { const v = m[k] || 0; if (v > 0) p += v; else q += v; } hi = Math.max(hi, p, m.totaal); lo = Math.min(lo, q, m.totaal); } const step = hi - lo > 240 ? 50 : 20; hi = Math.ceil(hi / step) * step; lo = Math.floor(lo / step) * step; const span = hi - lo; const pct = v => (v - lo) / span * 100; const ticks = []; for (let t = lo; t <= hi + 0.001; t += step) ticks.push(t); const legend = [...POS, ...NEG, OV].filter(([k]) => ms.some(m => Math.abs(m[k] || 0) > 0.004)); const n = ms.length; const lab = mm => M[+mm.split(''-'')[1] - 1]; const selMonth = (fs.find(f => f.label === sel) || {}).periode; const pick = mm => { const f = fs.find(x => x.periode === mm && x.totaal >= 0) || fs.find(x => x.periode === mm); if (f) hass.callService(''select'', ''select_option'', {entity_id: ''select.dots_energy_factuur'', option: f.label}); }; const pts = ms.map((m, i) => `${(i + 0.5) / n * 100},${100 - pct(m.totaal)}`).join('' ''); return html`<div class=''title''>Kost per maand, per categorie</div><div class=''legend''>${legend.map(([k, l, c]) => html`<span><i style=''background:${c}''></i>${l}</span>`)}</div><div class=''plot''><div class=''yax''>${ticks.map(t => html`<span style=''bottom:${pct(t)}%''>€ ${t}</span>`)}</div><div class=''area''>${ticks.map(t => html`<div class=''grid ${t === 0 ? ''zero'' : ''''}'' style=''bottom:${pct(t)}%''></div>`)}${ms.map((m, i) => { let up = 0, down = 0; const segs = []; for (const [k, l, c] of cats) { const v = m[k] || 0; if (Math.abs(v) < 0.005) continue; if (v > 0) { segs.push(html`<div class=''seg'' title=''${l}: ${eur(v)}'' style=''bottom:${pct(up)}%;height:${v / span * 100}%;background:${c}''></div>`); up += v; } else { down += v; segs.push(html`<div class=''seg'' title=''${l}: ${eur(v)}'' style=''bottom:${pct(down)}%;height:${-v / span * 100}%;background:${c}''></div>`); } } return html`<div class=''col ${m.maand === selMonth ? ''sel'' : ''''}'' style=''left:${i / n * 100}%;width:${100 / n}%'' title=''${lab(m.maand)}: ${eur(m.totaal)}'' @click=${e => { e.stopPropagation(); pick(m.maand); }}><div class=''bar''>${segs}</div></div>`; })}<svg viewBox=''0 0 100 100'' preserveAspectRatio=''none''><polyline points=''${pts}''></polyline></svg></div></div><div class=''xax''>${ms.map(m => html`<span>${lab(m.maand)}</span>`)}</div>`; ]]]'
+      styles:
+        card:
+        - padding: 16px 18px
+        - pointer-events: auto
+        - cursor: default
+        grid:
+        - grid-template-areas: '"c"'
+        - grid-template-columns: 1fr
+        custom_fields:
+          c:
+          - justify-self: stretch
+          - text-align: left
+          - pointer-events: auto
+      extra_styles: .title{font-size:15px;font-weight:500;color:var(--primary-text-color);margin-bottom:8px} .empty{color:var(--secondary-text-color);font-size:13px;padding:24px 0} .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--secondary-text-color);margin-bottom:12px} .legend span{display:inline-flex;align-items:center;gap:6px} .legend i{width:11px;height:11px;border-radius:2px;display:inline-block} .plot{display:flex;height:260px} .yax{position:relative;width:48px;flex:none} .yax span{position:absolute;right:8px;transform:translateY(50%);font-size:11px;color:var(--secondary-text-color);white-space:nowrap} .area{position:relative;flex:1} .grid{position:absolute;left:0;right:0;border-top:1px solid rgba(128,128,128,.16)} .grid.zero{border-top:1px solid rgba(128,128,128,.55)} .col{position:absolute;top:0;bottom:0;cursor:pointer;border-radius:6px} .col:hover,.col.sel{background:rgba(128,128,128,.12)} .bar{position:absolute;top:0;bottom:0;left:15%;right:15%} .seg{position:absolute;left:0;right:0} .area svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible} .area polyline{fill:none;stroke:rgba(210,210,210,.75);stroke-width:1.5;vector-effect:non-scaling-stroke;stroke-linejoin:round} .xax{display:flex;margin-left:48px;margin-top:6px} .xax span{flex:1;text-align:center;font-size:12px;color:var(--secondary-text-color)}
+    - type: custom:button-card
+      entity: sensor.dots_energy_gekozen_factuur
+      show_name: false
+      show_icon: false
+      show_state: false
+      tap_action:
+        action: none
+      hold_action:
+        action: none
       grid_options:
-        columns: full
-    - type: markdown
+        columns: 12
+        rows: auto
+      custom_fields:
+        d: '[[[ const a = entity.attributes || {}; const M = [''januari'',''februari'',''maart'',''april'',''mei'',''juni'',''juli'',''augustus'',''september'',''oktober'',''november'',''december'']; const eur = v => { const n = Number(v); return (n < 0 ? ''€ −'' : ''€ '') + Math.abs(n).toLocaleString(''nl-BE'', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }; const nf = (v, d) => Number(v).toLocaleString(''nl-BE'', {minimumFractionDigits: d, maximumFractionDigits: d}); const short = s => s.replace(/ elektriciteit$/i, ''''); const rs = (a.regels || []).filter(r => r.categorie !== ''afronding''); const inj = rs.find(r => /^evenwichtsbijdrage injectie/i.test(r.omschrijving)); const items = []; const add = (key, label, amount, order) => { const it = items.find(x => x.key === key); if (it) it.amount += amount; else items.push({key, label, amount, order}); }; for (const r of rs) { const d = r.omschrijving, lo = d.toLowerCase(); if (lo.startsWith(''elektriciteit totale uren'')) add(''e'', ''Energie'' + (r.hoeveelheid != null && r.eenheidsprijs != null ? '' '' + nf(r.hoeveelheid, 1) + '' kWh × '' + nf(r.eenheidsprijs, 4) : ''''), r.bedrag, 1); else if (lo.startsWith(''transport en distributie'')) add(''td'', ''Transport en distributie'', r.bedrag, 2); else if (lo.startsWith(''meet- en tel'')) add(''mt'', ''Meet- en telactiviteit'', r.bedrag, 3); else if (r.categorie === ''heffingen'') add(''h:'' + lo, short(d), r.bedrag, 4); else if (/certificaten/i.test(d)) add(''cert'', ''GSC en WKK-certificaten'', r.bedrag, 5); else if (r.categorie === ''vaste_kosten'') add(''vk'', ''Vaste vergoeding'', r.bedrag, 6); else if (lo.startsWith(''evenwichtsbijdrage'')) add(''ev'', ''Evenwichtsbijdrage'', r.bedrag, 7); else if (r.categorie === ''injectie'') add(''inj'', ''Injectie'' + (inj && inj.hoeveelheid != null ? '' '' + nf(inj.hoeveelheid, 1) + '' kWh'' : ''''), r.bedrag, 8); else if (r.categorie === ''vergoedingen'') add(''v:'' + lo, d, r.bedrag, 9); else if (r.categorie === ''btw'') add(''b:'' + lo, ''Btw '' + d, r.bedrag, 10); else add(''o:'' + lo, short(d), r.bedrag, 11); } const rows = items.filter(i => Math.abs(i.amount) >= 0.005).sort((x, y) => x.order - y.order).map(i => `<div class=''row''><span class=''lbl''>${i.label}</span><span class=''amt''>${eur(i.amount)}</span></div>`).join(''''); const p = (a.periode || '''').split(''-''); const mon = p.length > 1 ? M[+p[1] - 1] : ''''; const title = mon ? mon.charAt(0).toUpperCase() + mon.slice(1) : ''Factuur''; const pill = a.status === ''paid'' ? `<span class=''pill ok''>Betaald</span>` : a.status === ''pending'' ? `<span class=''pill wait''>In behandeling</span>` : (a.status ? `<span class=''pill bad''>${a.status}</span>` : ''''); const note = rows ? '''' : `<div class=''empty''>De regels van deze factuur zijn (nog) niet opgehaald.</div>`; return `<div class=''hd''><span class=''t''>${title} · ${a.factuurnummer || ''''}</span>${pill}</div>${rows}${note}<div class=''row tot''><span class=''lbl''>Totaal</span><span class=''amt''>${eur(entity.state)}</span></div>`; ]]]'
+      styles:
+        card:
+        - padding: 16px 18px
+        - height: 100%
+        grid:
+        - grid-template-areas: '"d"'
+        - grid-template-columns: 1fr
+        - align-content: start
+        custom_fields:
+          d:
+          - justify-self: stretch
+          - text-align: left
+      extra_styles: .hd{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-bottom:10px} .t{font-size:16px;font-weight:500;color:var(--primary-text-color)} .row{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid rgba(128,128,128,.22);font-size:14px} .lbl{color:var(--secondary-text-color)} .amt{color:var(--primary-text-color);white-space:nowrap;font-variant-numeric:tabular-nums} .tot{border-top:1px solid rgba(128,128,128,.6);font-weight:500} .tot .lbl{color:var(--primary-text-color)} .pill{font-size:12px;padding:3px 10px;border-radius:999px;white-space:nowrap} .ok{background:rgba(76,175,80,.16);color:#6cc070} .wait{background:rgba(240,160,48,.16);color:#f0a030} .bad{background:rgba(229,57,53,.16);color:#ef6461} .empty{color:var(--secondary-text-color);font-size:13px;padding:8px 0}
+    - type: custom:button-card
+      entity: sensor.dots_energy_maandoverzicht
+      show_name: false
+      show_icon: false
+      show_state: false
+      tap_action:
+        action: none
+      hold_action:
+        action: none
+      triggers_update:
+      - select.dots_energy_factuur
+      - sensor.dots_energy_laatst_bijgewerkt
+      - sensor.dots_energy_openstaand
       grid_options:
-        columns: full
-      content: |-
-        {% set f = 'sensor.dots_energy_gekozen_factuur' %}{% set regels = state_attr(f, 'regels') or [] %}{% set namen = {'energie': 'Energie', 'netkosten': 'Netkosten', 'heffingen': 'Heffingen', 'vaste_kosten': 'Vaste kosten', 'btw': 'Btw', 'injectie': 'Injectie', 'vergoedingen': 'Vergoedingen', 'overig': 'Overig'} %}{% macro eur(x) %}€ {{ '%.2f' | format(x | float(0)) | replace('.', ',') }}{% endmacro %}**{{ state_attr(f, 'factuurnummer') }}** · {{ 'betaald' if state_attr(f, 'status') == 'paid' else 'in behandeling' if state_attr(f, 'status') == 'pending' else state_attr(f, 'status') }}
-
-        | Regel | | Bedrag |
-        |:--|--:|--:|
-        {% for r in regels if r.categorie != 'afronding' and r.bedrag != 0 %}| {{ 'Btw ' ~ r.omschrijving if r.categorie == 'btw' else r.omschrijving }} | {% if r.hoeveelheid is not none and r.eenheidsprijs is not none and r.hoeveelheid != 1 and r.categorie != 'btw' %}{{ (r.hoeveelheid | round(3)) | string | replace('.', ',') }} × {{ r.eenheidsprijs | string | replace('.', ',') }}{% endif %} | {{ eur(r.bedrag) }} |
-        {% endfor %}| **Totaal** | | **{{ eur(states(f)) }}** |
-
-        {% set c = state_attr(f, 'categorieen') or {} %}{% for k, v in c.items() if v != 0 %}{{ namen.get(k, k) }} {{ eur(v) }}{{ ' · ' if not loop.last }}{% endfor %}
-  - type: grid
-    cards:
-    - type: heading
-      heading: Alle facturen
-      heading_style: title
-      icon: mdi:format-list-bulleted
-    - type: tile
-      entity: sensor.dots_energy_openstaand
-      name: Openstaand
-      icon: mdi:cash-clock
-      color: orange
-      grid_options:
-        columns: full
-    - type: markdown
-      grid_options:
-        columns: full
-      content: |-
-        {% set maanden = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'] %}| Periode | Bedrag | Status |
-        |:--|--:|:--|
-        {% for f in state_attr('sensor.dots_energy_maandoverzicht', 'facturen') or [] %}{% set p = f.periode.split('-') %}| {{ maanden[p[1] | int - 1] }} {{ p[0] }} | € {{ '%.2f' | format(f.totaal) | replace('.', ',') }} | {% if f.status == 'paid' %}<ha-icon icon="mdi:check-circle"></ha-icon> Betaald{% elif f.status == 'pending' %}<ha-icon icon="mdi:timer-sand"></ha-icon> In behandeling{% else %}<ha-icon icon="mdi:alert-circle"></ha-icon> {{ f.status }}{% endif %} |
-        {% endfor %}
+        columns: 12
+        rows: auto
+      custom_fields:
+        f: '[[[ const fs = entity.attributes.facturen || []; const sel = states[''select.dots_energy_factuur'']?.state; const M = [''jan'',''feb'',''mrt'',''apr'',''mei'',''jun'',''jul'',''aug'',''sep'',''okt'',''nov'',''dec'']; const y = String(new Date().getFullYear()); const eur = v => { const n = Number(v); return (n < 0 ? ''€ −'' : ''€ '') + Math.abs(n).toLocaleString(''nl-BE'', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }; const st = s => s === ''paid'' ? [''Betaald'', ''ok''] : s === ''pending'' ? [''In behandeling'', ''wait''] : [s, ''bad'']; const upd = states[''sensor.dots_energy_laatst_bijgewerkt'']; const t = upd ? new Date(upd.state) : null; const age = t && !isNaN(t) ? (Date.now() - t) / 3600000 : 999; const ago = age >= 999 ? ''onbekend'' : age < 1 ? Math.max(1, Math.round(age * 60)) + '' min geleden'' : age < 48 ? Math.round(age) + '' u geleden'' : Math.round(age / 24) + '' dagen geleden''; const open = Number(states[''sensor.dots_energy_openstaand'']?.state || 0); const pick = f => hass.callService(''select'', ''select_option'', {entity_id: ''select.dots_energy_factuur'', option: f.label}); return html`<div class=''t''>Facturen</div>${fs.map(f => { const p = f.periode.split(''-''); const [txt, cls] = st(f.status); return html`<div class=''row ${f.label === sel ? ''sel'' : ''''}'' @click=${e => { e.stopPropagation(); pick(f); }}><span class=''m''>${M[+p[1] - 1]}${p[0] !== y ? '' '' + p[0] : ''''}</span><span class=''amt''>${eur(f.totaal)}</span><span class=''pill ${cls}''>${txt}</span></div>`; })}<div class=''foot''><span>${open > 0.004 ? ''Openstaand '' + eur(open) : ''Alles betaald''}</span><span class=''${age > 24 ? ''stale'' : ''''}''>Bijgewerkt ${ago}</span></div>`; ]]]'
+      styles:
+        card:
+        - padding: 16px 18px
+        - height: 100%
+        - pointer-events: auto
+        - cursor: default
+        grid:
+        - grid-template-areas: '"f"'
+        - grid-template-columns: 1fr
+        - align-content: start
+        custom_fields:
+          f:
+          - justify-self: stretch
+          - text-align: left
+          - pointer-events: auto
+      extra_styles: .t{font-size:16px;font-weight:500;color:var(--primary-text-color);padding-bottom:10px} .row{display:flex;align-items:center;gap:12px;padding:9px 8px;margin:0 -8px;border-top:1px solid rgba(128,128,128,.22);font-size:14px;cursor:pointer;border-radius:8px} .row:hover,.row.sel{background:rgba(128,128,128,.12)} .m{flex:1;color:var(--primary-text-color)} .amt{color:var(--primary-text-color);white-space:nowrap;font-variant-numeric:tabular-nums} .pill{font-size:12px;padding:3px 10px;border-radius:999px;white-space:nowrap;min-width:92px;text-align:center} .ok{background:rgba(76,175,80,.16);color:#6cc070} .wait{background:rgba(240,160,48,.16);color:#f0a030} .bad{background:rgba(229,57,53,.16);color:#ef6461} .foot{display:flex;justify-content:space-between;gap:12px;padding-top:12px;margin-top:4px;border-top:1px solid rgba(128,128,128,.22);font-size:12px;color:var(--secondary-text-color)} .stale{color:#f0a030}
