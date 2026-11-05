@@ -47,6 +47,7 @@ from .sources import (
     async_quarter_changes,
     capacity_kw,
     current_price,
+    raw_prices,
     slot_floor,
 )
 from .tariff import Bill, FitParams, MonthUsage, TariffRules, derive_rules
@@ -283,11 +284,16 @@ class DotsForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
                 "price_backfill": loaded.get("price_backfill"),
                 "quarter_backfill": list(loaded.get("quarter_backfill", [])),
                 "measured": dict(loaded.get("measured", {})),
+                "sources": loaded.get("sources"),
                 "capacity": dict(loaded.get("capacity", {})),
                 "snapshots": dict(loaded.get("snapshots", {})),
                 "previous_daily": dict(loaded.get("previous_daily", {})),
             }
-            self._prices = _decode_prices(loaded.get("prices", {}))
+            stored_prices = loaded.get("prices", {})
+            if any("T" in key for key in stored_prices):
+                # v0.2.0 kept hourly averages: fetch the recorded history again per quarter.
+                self._stored["price_backfill"] = None
+            self._prices = _decode_prices(stored_prices)
             self._quarters = {
                 eid: decode_days(days) for eid, days in loaded.get("quarters", {}).items()
             }
@@ -312,7 +318,7 @@ class DotsForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
         prev_start = shift_month(month_start, -1)
         run = self.hass.async_add_executor_job
         try:
-            self._prune(month_start)
+            self._check_sources(options)
             await self._async_update_prices(options, rules.vat_rate, prev_start, now)
             await self._async_update_quarters(options, prev_start, now)
             capacity = capacity_kw(self.hass, options.get(OPT_CAPACITEIT))
@@ -320,6 +326,7 @@ class DotsForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
                 stored["capacity"][month_key(month_start)] = str(capacity)
             prev_ctx = await self._async_context(options, prev_start, month_start, None)
             prev_measured = await run(_measured, prev_ctx)
+            stored["measured"][prev_measured.month] = _usage_to_dict(prev_measured)
             params = await self._async_fit(options, details, data, month_start, prev_measured)
             previous = _daily_average(prev_measured, bool(prev_ctx.afname.values))
             ctx = await self._async_context(options, month_start, now, previous)
@@ -328,6 +335,7 @@ class DotsForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
         except Exception as err:  # recorder failures come in many types
             raise UpdateFailed(f"Voorspelling niet berekend: {err}") from err
         self._snapshot(month_key(month_start), now, result.expected)
+        self._prune(month_start)
         self._store.async_delay_save(self._data_to_save, SAVE_DELAY)
         last = data.kpis.last_invoice
         return ForecastData(
@@ -339,6 +347,25 @@ class DotsForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
             quality="ruw" if result.missing else "volledig",
             computed_at=dt_util.utcnow(),
         )
+
+    def _check_sources(self, options: Mapping[str, Any]) -> None:
+        """Month totals and prices are only valid for the sources they were measured with."""
+        sources = {
+            "meting": [
+                options.get(OPT_AFNAME),
+                options.get(OPT_INJECTIE),
+                sorted(options.get(OPT_GESTUURD) or []),
+            ],
+            "prijs": [options.get(OPT_PRIJS), bool(options.get(OPT_PRIJS_INCL_BTW, False))],
+        }
+        previous = self.stored.get("sources")
+        if previous is not None and previous != sources:
+            self.stored["measured"] = {}
+            self.stored["previous_daily"] = {}
+            if previous.get("prijs") != sources["prijs"]:
+                self._prices = {}
+                self.stored["price_backfill"] = None
+        self.stored["sources"] = sources
 
     def _recent_start(self, done: bool, prev_start: datetime, now: datetime) -> datetime:
         """From the previous month on the first run for a source, else the last 48 hours."""
@@ -361,11 +388,10 @@ class DotsForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
         )
         self._prices.update(history)
         self.stored["price_backfill"] = price_id
-        # Open and future quarters: what the sensor publishes now.
+        # Published quarter prices are exact: they win over the averaged state history.
+        self._prices.update(raw_prices(self.hass, price_id, incl_vat, vat_rate))
         for slot, price in current_price(self.hass, price_id, incl_vat, vat_rate).items():
             if slot >= open_slot:
-                self._prices[slot] = price
-            else:
                 self._prices.setdefault(slot, price)
 
     @staticmethod

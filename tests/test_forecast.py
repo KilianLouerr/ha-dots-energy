@@ -72,7 +72,7 @@ async def _setup(
     freezer.move_to(now)
     _mock_api(aioclient_mock)
     tz = dt_util.get_default_time_zone()
-    start = dt_util.parse_datetime("2026-01-31 23:00:00").replace(tzinfo=tz)
+    start = dt_util.parse_datetime("2025-12-31 23:00:00").replace(tzinfo=tz)
     end = dt_util.now().replace(minute=0, second=0, microsecond=0)
     await _import_hourly(hass, IMPORT, start, end)
     entry = MockConfigEntry(
@@ -300,4 +300,77 @@ async def test_complete_months_are_kept_as_totals(hass, aioclient_mock, freezer)
     entry = await _setup(hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT})
     measured = entry.runtime_data.forecast.stored["measured"]
     assert "2026-01" in measured
-    assert "2026-02" not in measured
+    assert "2026-02" in measured
+
+
+def _legacy_store(hass_storage, entry_id: str, prices: dict[str, str], **extra) -> None:
+    hass_storage[f"{DOMAIN}.{entry_id}.forecast"] = {
+        "version": 1,
+        "key": f"{DOMAIN}.{entry_id}.forecast",
+        "data": {"prices": prices, **extra},
+    }
+
+
+async def test_older_months_keep_their_market_prices(
+    hass, aioclient_mock, freezer, hass_storage
+) -> None:
+    start = dt_util.parse_datetime("2026-01-01T00:00:00+01:00")
+    prices = {
+        (start + timedelta(hours=h)).astimezone(dt_util.UTC).isoformat(): "0.1"
+        for h in range(31 * 24)
+    }
+    _legacy_store(hass_storage, "older", prices)
+    entry = await _setup(
+        hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT, OPT_PRIJS: PRICE}, entry_id="older"
+    )
+    january = entry.runtime_data.forecast.stored["measured"]["2026-01"]
+    assert Decimal(january["priced_in"][0]) > 700
+
+
+async def test_changed_sources_drop_month_totals(hass, aioclient_mock, freezer) -> None:
+    entry = await _setup(hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT})
+    coordinator = entry.runtime_data.forecast
+    assert Decimal(coordinator.stored["measured"]["2026-01"]["kwh_in"]) > 700
+    hass.config_entries.async_update_entry(entry, options={OPT_AFNAME: "sensor.my_other_meter"})
+    await coordinator.async_refresh()
+    assert Decimal(coordinator.stored["measured"]["2026-01"]["kwh_in"]) == 0
+
+
+async def test_published_quarter_price_wins_over_state_history(
+    hass, aioclient_mock, freezer
+) -> None:
+    entry = await _setup(hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT, OPT_PRIJS: PRICE})
+    now = dt_util.utcnow()
+    quarter = now.replace(minute=now.minute - now.minute % 15, second=0, microsecond=0)
+    raw = [{"start": quarter, "end": quarter + timedelta(minutes=15), "value": 0.10}]
+    hass.states.async_set(PRICE, "0.30", {"raw_today": raw})
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(hours=1))
+    await entry.runtime_data.forecast.async_refresh()
+    assert entry.runtime_data.forecast.price_at(quarter) == Decimal("0.1")
+
+
+async def test_legacy_hourly_prices_are_fetched_again_per_quarter(
+    hass, aioclient_mock, freezer, hass_storage
+) -> None:
+    await hass.config.async_update(time_zone="Europe/Brussels")
+    earlier = dt_util.parse_datetime("2026-03-17T10:00:00+01:00")
+    freezer.move_to(earlier)
+    hass.states.async_set(PRICE, "0.40")
+    await hass.async_block_till_done()
+    freezer.move_to(earlier + timedelta(minutes=30))
+    hass.states.async_set(PRICE, "0.20")
+    await hass.async_block_till_done()
+    await async_wait_recording_done(hass)
+    _legacy_store(
+        hass_storage,
+        "relegacy",
+        {earlier.astimezone(dt_util.UTC).isoformat(): "0.3"},
+        price_backfill=PRICE,
+    )
+    entry = await _setup(
+        hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT, OPT_PRIJS: PRICE}, entry_id="relegacy"
+    )
+    coordinator = entry.runtime_data.forecast
+    assert coordinator.price_at(earlier) == Decimal("0.4")
+    assert coordinator.price_at(earlier + timedelta(minutes=30)) == Decimal("0.2")

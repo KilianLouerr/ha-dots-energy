@@ -25,6 +25,7 @@ from custom_components.dots_energy.sources import (
     async_quarter_changes,
     capacity_kw,
     current_price,
+    raw_prices,
 )
 
 D = Decimal
@@ -202,3 +203,23 @@ async def test_quarter_with_missing_rows_is_absent(recorder_mock, hass) -> None:
         hass, "sensor.my_grid_import", START, START + timedelta(minutes=15)
     )
     assert START not in series
+
+
+async def test_first_five_minute_row_is_not_counted_as_cumulative(recorder_mock, hass) -> None:
+    """A window starting before the oldest row must not turn the meter total into a quarter."""
+    _short_term(
+        hass, "sensor.my_grid_import", [5000, 5000.1, 5000.2, 5000.3, 5000.4, 5000.5], START
+    )
+    await async_wait_recording_done(hass)
+    series = await async_quarter_changes(
+        hass, "sensor.my_grid_import", START - timedelta(hours=1), START + timedelta(minutes=30)
+    )
+    assert START not in series
+    assert series[START + timedelta(minutes=15)] == D("0.3")
+
+
+async def test_raw_prices_separate_from_state(hass) -> None:
+    now = dt_util.utcnow().replace(minute=0, second=0, microsecond=0)
+    raw = [{"start": now, "end": now + timedelta(minutes=15), "value": 0.10}]
+    _state(hass, "0.30", {"raw_today": raw})
+    assert raw_prices(hass, "sensor.my_day_ahead_price", False, VAT) == {now: D("0.1")}

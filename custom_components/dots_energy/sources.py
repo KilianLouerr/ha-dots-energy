@@ -16,6 +16,7 @@ from .projection import SLOT
 
 HOUR = timedelta(hours=1)
 FIVE_MINUTES_PER_SLOT = 3
+FIVE_MINUTES = timedelta(minutes=5)
 KWH_PRECISION = Decimal("0.000001")
 
 
@@ -43,8 +44,13 @@ def _as_datetime(value: Any) -> datetime | None:
     return None
 
 
-async def _changes(
-    hass: HomeAssistant, entity_id: str, start: datetime, end: datetime, period: str
+async def _rows(
+    hass: HomeAssistant,
+    entity_id: str,
+    start: datetime,
+    end: datetime,
+    period: str,
+    kind: str,
 ) -> list[tuple[datetime, Decimal]]:
     rows = await get_instance(hass).async_add_executor_job(
         statistics_during_period,
@@ -54,16 +60,22 @@ async def _changes(
         {entity_id},
         period,
         {"energy": "kWh"},
-        {"change"},
+        {kind},
     )
     result = []
     for row in rows.get(entity_id, []):
         start_time = _as_datetime(row.get("start"))
-        change = _decimal(row.get("change")) if row.get("change") is not None else None
-        if start_time is not None and change is not None:
+        value = _decimal(row.get(kind)) if row.get(kind) is not None else None
+        if start_time is not None and value is not None:
             # Statistics are floats; a micro-kWh is far below any meter's resolution.
-            result.append((start_time.astimezone(UTC), change.quantize(KWH_PRECISION)))
+            result.append((start_time.astimezone(UTC), value.quantize(KWH_PRECISION)))
     return result
+
+
+async def _changes(
+    hass: HomeAssistant, entity_id: str, start: datetime, end: datetime, period: str
+) -> list[tuple[datetime, Decimal]]:
+    return await _rows(hass, entity_id, start, end, period, "change")
 
 
 async def async_hourly_changes(
@@ -82,7 +94,14 @@ async def async_quarter_changes(
     """
     sums: dict[datetime, Decimal] = {}
     counts: dict[datetime, int] = {}
-    for moment, change in await _changes(hass, entity_id, start, end, "5minute"):
+    # Differences of consecutive sums: HA's own "change" of the oldest row in the window
+    # is the meter's whole running total when nothing older is kept.
+    # One extra row before `start` so the first quarter's first change is known.
+    rows = await _rows(hass, entity_id, start - FIVE_MINUTES, end, "5minute", "sum")
+    for (before, before_sum), (moment, value) in zip(rows, rows[1:], strict=False):
+        if moment - before != FIVE_MINUTES:
+            continue
+        change = value - before_sum
         slot = slot_floor(moment)
         sums[slot] = sums.get(slot, Decimal(0)) + change
         counts[slot] = counts.get(slot, 0) + 1
@@ -114,18 +133,26 @@ def _raw_prices(entries: Iterable[Any]) -> dict[datetime, Decimal]:
     return prices
 
 
-def current_price(
+def raw_prices(
     hass: HomeAssistant, entity_id: str, incl_vat: bool, vat_rate: Decimal
 ) -> dict[datetime, Decimal]:
-    """Known prices per quarter hour (EUR/kWh, without VAT) from the price sensor now."""
+    """Published quarter prices (raw_today / raw_tomorrow), without VAT."""
     state = hass.states.get(entity_id)
     if state is None:
         return {}
     raw: dict[datetime, Decimal] = {}
     for key in ("raw_today", "raw_tomorrow"):
         raw.update(_raw_prices(state.attributes.get(key)))
-    prices = {q: _net(p, incl_vat, vat_rate) for q, p in raw.items()}
-    value = _decimal(state.state)
+    return {q: _net(p, incl_vat, vat_rate) for q, p in raw.items()}
+
+
+def current_price(
+    hass: HomeAssistant, entity_id: str, incl_vat: bool, vat_rate: Decimal
+) -> dict[datetime, Decimal]:
+    """Known prices per quarter hour (EUR/kWh, without VAT) from the price sensor now."""
+    prices = raw_prices(hass, entity_id, incl_vat, vat_rate)
+    state = hass.states.get(entity_id)
+    value = _decimal(state.state) if state is not None else None
     if value is not None:
         prices.setdefault(slot_floor(dt_util.utcnow()), _net(value, incl_vat, vat_rate))
     return prices

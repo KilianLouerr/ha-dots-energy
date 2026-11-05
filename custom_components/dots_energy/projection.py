@@ -30,23 +30,43 @@ class SlotSeries:
     values: Mapping[datetime, Decimal]
 
 
+def _tolerance(total: Decimal) -> Decimal:
+    return max(Decimal("0.01"), total * Decimal("0.02"))
+
+
 def merge_quarters(
     hourly: Mapping[datetime, Decimal], quarters: Mapping[datetime, Decimal]
 ) -> dict[datetime, Decimal]:
-    """Measured quarters where known; the rest of each hour from its hourly total.
+    """Measured quarters where they are plausible; otherwise the hourly total, spread.
 
     Quarters missing within an hour share what the measured quarters leave of the
-    hourly total, so the hour still adds up.
+    hourly total. Measured quarters that fall outside [0, MAX] or do not add up to
+    the hourly total are ignored for that hour.
     """
-    merged = dict(quarters)
-    for hour, total in hourly.items():
-        slots = [hour + SLOT * index for index in range(SLOTS_PER_HOUR)]
-        missing = [q for q in slots if q not in quarters]
-        if not missing:
+    by_hour: dict[datetime, dict[datetime, Decimal]] = {}
+    for q, value in quarters.items():
+        by_hour.setdefault(q.replace(minute=0), {})[q] = value
+    merged: dict[datetime, Decimal] = {}
+    for hour in set(hourly) | set(by_hour):
+        measured = {q: v for q, v in by_hour.get(hour, {}).items() if ZERO <= v <= MAX_SLOT_KWH}
+        if len(measured) != len(by_hour.get(hour, {})):
+            measured = {}
+        total = hourly.get(hour)
+        if total is None:
+            merged.update(measured)
             continue
-        rest = max(total - sum((quarters[q] for q in slots if q in quarters), ZERO), ZERO)
+        counted = sum(measured.values(), ZERO)
+        complete = len(measured) == SLOTS_PER_HOUR
+        if (complete and abs(counted - total) > _tolerance(total)) or (
+            counted > total + _tolerance(total)
+        ):
+            measured, counted = {}, ZERO
+        merged.update(measured)
+        missing = [
+            hour + SLOT * i for i in range(SLOTS_PER_HOUR) if hour + SLOT * i not in measured
+        ]
         for q in missing:
-            merged[q] = rest / len(missing)
+            merged[q] = max(total - counted, ZERO) / len(missing)
     return merged
 
 
@@ -224,9 +244,21 @@ def _remaining_priced(
     return kwh, cost
 
 
+def _until(ctx: MonthContext) -> datetime:
+    """Last closed quarter; back to the hour start while the open hour is not measured yet."""
+    until = max(_slot_floor(ctx.now), ctx.month_start)
+    hour = max(until.replace(minute=0), ctx.month_start)
+    q = hour
+    while q < until:
+        if q.astimezone(UTC) not in ctx.afname.values:
+            return hour
+        q += SLOT
+    return until
+
+
 def forecast(ctx: MonthContext, rules: TariffRules, params: FitParams) -> Forecast:
     """'So far' and 'expected' for the month of `ctx`."""
-    until = max(_slot_floor(ctx.now), ctx.month_start)
+    until = _until(ctx)
     so_far_usage, invalid = usage_until(ctx, until)
     so_far = price_month(so_far_usage, rules, params)
     elapsed = so_far_usage.days
@@ -277,7 +309,7 @@ def cumulative_series(
     if last_day < 1:
         return ()
     tz = ctx.month_start.tzinfo
-    until = max(_slot_floor(ctx.now), ctx.month_start)
+    until = _until(ctx)
     slots, afname, injectie, gestuurd, _ = _measure(ctx, until)
     base = ctx.month_start.replace(tzinfo=None)
     kwh_in = kwh_out = steered = ZERO

@@ -211,3 +211,29 @@ def test_merge_quarters_without_hourly_value():
     hour = datetime(2026, 1, 1, 10, tzinfo=UTC)
     merged = merge_quarters({}, {hour + timedelta(minutes=30): D("0.7")})
     assert merged == {hour + timedelta(minutes=30): D("0.7")}
+
+
+def test_merge_ignores_quarters_that_do_not_add_up_to_the_hour():
+    hour = datetime(2026, 1, 1, 10, tzinfo=UTC)
+    q = timedelta(minutes=15)
+    quarters = {hour + q * i: D("5000") if i == 0 else D("0.1") for i in range(4)}
+    merged = merge_quarters({hour: D(2)}, quarters)
+    assert [merged[hour + q * i] for i in range(4)] == [D("0.5")] * 4
+
+
+def test_merge_ignores_negative_quarter():
+    hour = datetime(2026, 1, 1, 10, tzinfo=UTC)
+    merged = merge_quarters({hour: D(2)}, {hour: D("-0.3")})
+    assert merged[hour] == D("0.5")
+
+
+def test_open_hour_without_quarters_falls_back_to_hour_start():
+    """At 12:40 with no 5-minute data yet for 12:00-12:30, count only up to 12:00."""
+    now = datetime(2026, 1, 3, 12, 40, tzinfo=TZ)
+    hour = datetime(2026, 1, 3, 12, 0, tzinfo=TZ)
+    ctx = _ctx(now)
+    for q in (hour, hour + timedelta(minutes=15)):
+        ctx.afname.values.pop(q.astimezone(UTC), None)
+    result = forecast(ctx, _rules(), FitParams())
+    assert "meting" not in result.missing
+    assert result.elapsed_days == D(60) / 24
