@@ -7,7 +7,6 @@ requires-python = ">=3.14.2,<3.15"
 [dependency-groups]
 dev = [
     "pytest-homeassistant-custom-component==0.13.375",
-    "aioresponses>=0.7.8",
 ]
 
 [tool.pytest.ini_options]
