@@ -28,7 +28,7 @@
       },
       "refresh_token": {
         "title": "Refresh token",
-        "description": "Open a private browser window, sign in at https://my.dotsenergy.be, open the developer tools (F12) → Application → Session Storage → https://my.dotsenergy.be → the key starting with oidc.user: and copy the value of refresh_token. Close that window afterwards and do not use that session again.",
+        "description": "Open a private browser window, sign in at {portal_url}, open the developer tools (F12) → Application → Session Storage → {portal_url} → the key starting with oidc.user: and copy the value of refresh_token. Close that window afterwards and do not use that session again.",
         "data": {
           "refresh_token": "Refresh token"
         }

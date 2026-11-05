@@ -133,6 +133,7 @@ async def test_refresh_token_flow_creates_entry(hass, aioclient_mock) -> None:
         result["flow_id"], {"next_step_id": "refresh_token"}
     )
     assert result["step_id"] == "refresh_token"
+    assert result["description_placeholders"] == {"portal_url": "https://my.dotsenergy.be"}
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_REFRESH_TOKEN: "RT-pasted"}
     )

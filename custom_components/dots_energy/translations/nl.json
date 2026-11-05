@@ -28,7 +28,7 @@
       },
       "refresh_token": {
         "title": "Refresh token",
-        "description": "Open een privévenster, meld je aan op https://my.dotsenergy.be, open de ontwikkelaarstools (F12) → Application → Session Storage → https://my.dotsenergy.be → de sleutel die begint met oidc.user: en kopieer de waarde van refresh_token. Sluit dat venster daarna en gebruik die sessie niet meer.",
+        "description": "Open een privévenster, meld je aan op {portal_url}, open de ontwikkelaarstools (F12) → Application → Session Storage → {portal_url} → de sleutel die begint met oidc.user: en kopieer de waarde van refresh_token. Sluit dat venster daarna en gebruik die sessie niet meer.",
         "data": {
           "refresh_token": "Refresh token"
         }

@@ -22,7 +22,7 @@ from homeassistant.helpers.selector import (
 
 from .api import ApiError, DotsApiClient
 from .auth import AuthError, CannotConnect, CaptchaRequired, DotsAuth, InvalidCredentials, TokenSet
-from .const import CONF_LOCATION_ID, CONF_REFRESH_TOKEN, DOMAIN
+from .const import CONF_LOCATION_ID, CONF_REFRESH_TOKEN, DOMAIN, REDIRECT_URI
 from .session import ha_login_session
 
 _LOGGER = logging.getLogger(__name__)
@@ -143,6 +143,7 @@ class DotsConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="refresh_token",
             data_schema=vol.Schema({vol.Required(CONF_REFRESH_TOKEN): _PASSWORD_SELECTOR}),
             errors=errors,
+            description_placeholders={"portal_url": REDIRECT_URI},
         )
 
     async def _async_finish(self) -> ConfigFlowResult:
