@@ -6,7 +6,7 @@ import calendar
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -50,6 +50,7 @@ STORAGE_VERSION = 1
 KEEP_MONTHS = 13
 UPDATE_MINUTE = 12
 SAVE_DELAY = 10
+PRICE_HISTORY_WINDOW = timedelta(hours=48)
 
 Series = tuple[tuple[int, Decimal], ...]
 
@@ -218,14 +219,23 @@ class DotsForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
         if not price_id:
             return
         incl_vat = bool(options.get(OPT_PRIJS_INCL_BTW, False))
+        open_hour = now.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
+        # Closed hours: time-weighted average of the recorded state history, so
+        # quarter-hour prices are averaged and a missed run is recovered later.
+        start = open_hour - PRICE_HISTORY_WINDOW
         if self.stored.get("price_backfill") != price_id:
-            history = await async_price_history(
-                self.hass, price_id, prev_start.astimezone(UTC), now, incl_vat, vat_rate
-            )
-            for hour, price in history.items():
+            start = min(start, prev_start.astimezone(UTC))
+        history = await async_price_history(
+            self.hass, price_id, start, open_hour, incl_vat, vat_rate
+        )
+        self._prices.update(history)
+        self.stored["price_backfill"] = price_id
+        # Open and future hours: what the sensor knows now.
+        for hour, price in current_price(self.hass, price_id, incl_vat, vat_rate).items():
+            if hour >= open_hour:
+                self._prices[hour] = price
+            else:
                 self._prices.setdefault(hour, price)
-            self.stored["price_backfill"] = price_id
-        self._prices.update(current_price(self.hass, price_id, incl_vat, vat_rate))
 
     async def _async_series(
         self, entity_ids: list[str], start: datetime, end: datetime

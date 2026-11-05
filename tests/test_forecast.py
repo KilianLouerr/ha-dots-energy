@@ -219,3 +219,24 @@ async def test_forecast_sensors_ruw_flag(hass, aioclient_mock, freezer) -> None:
         state = hass.states.get(entity_id)
         assert state.attributes["kwaliteit"] == "ruw"
         assert "marktprijs" in state.attributes["ontbreekt"]
+
+
+async def test_closed_hour_price_is_time_weighted_average(
+    hass, aioclient_mock, freezer, hass_storage
+) -> None:
+    entry = await _setup(hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT, OPT_PRIJS: PRICE})
+    hour = dt_util.now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    freezer.move_to(hour)
+    hass.states.async_set(PRICE, "0.10")
+    await hass.async_block_till_done()
+    freezer.move_to(hour + timedelta(minutes=30))
+    hass.states.async_set(PRICE, "0.20")
+    await hass.async_block_till_done()
+    run = hour + timedelta(hours=1, minutes=12)
+    freezer.move_to(run)
+    async_fire_time_changed(hass, run)
+    await hass.async_block_till_done()
+    coordinator = entry.runtime_data.forecast
+    await coordinator.async_flush()
+    prices = hass_storage[f"{DOMAIN}.{entry.entry_id}.forecast"]["data"]["prices"]
+    assert prices[hour.astimezone(dt_util.UTC).isoformat()] == "0.15"
