@@ -161,8 +161,6 @@ async def test_malformed_detail_raises_api_error(aioclient_mock, client) -> None
 
 async def test_unexpected_contract_shape_raises_api_error(aioclient_mock, client) -> None:
     aioclient_mock.post(TOKEN, json=token_payload("AT-1", "RT-1"))
-    aioclient_mock.get(
-        f"{API}/v1/my/locations/7/contracts/active?energyType=electricity", json=[]
-    )
+    aioclient_mock.get(f"{API}/v1/my/locations/7/contracts/active?energyType=electricity", json=[])
     with pytest.raises(ApiError):
         await client.async_get_active_contract(7)

@@ -176,6 +176,7 @@ async def test_diagnostics_redacts_secrets(hass, entry) -> None:
 
     for secret in (EMAIL, PASSWORD, "RT-0", "RT-1", "AT-1", "TST0000"):
         assert secret not in dumped
+    assert diagnostics["entry"]["location_id"] == "**REDACTED**"
     assert diagnostics["data"]["invoices"][0]["index"] == 0
     assert diagnostics["data"]["kpis"]["outstanding"] == 88.38
 

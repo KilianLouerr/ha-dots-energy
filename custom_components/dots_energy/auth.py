@@ -164,7 +164,7 @@ class DotsAuth:
                     data = {}
         except (aiohttp.ClientError, TimeoutError) as err:
             raise CannotConnect(f"Token endpoint unreachable: {type(err).__name__}") from err
-        if status >= 500:
+        if status >= 500 or status == 429:
             raise CannotConnect(f"Token endpoint returned HTTP {status}")
         if status != 200:
             error = data.get("error") if isinstance(data, dict) else None

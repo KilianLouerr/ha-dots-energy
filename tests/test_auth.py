@@ -241,3 +241,10 @@ async def test_login_server_error_raises_cannot_connect(aioclient_mock, make_aut
         aioclient_mock.get(LOGIN, status=502, text="bad gateway")
     with pytest.raises(CannotConnect):
         await make_auth().async_login()
+
+
+async def test_rate_limited_token_endpoint_raises_cannot_connect(aioclient_mock, make_auth) -> None:
+    auth = make_auth(refresh_token="RT-x")
+    aioclient_mock.post(TOKEN, status=429, json={"error": "too_many_requests"})
+    with pytest.raises(CannotConnect):
+        await auth.async_get_access_token()

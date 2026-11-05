@@ -9,10 +9,10 @@ from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 
 from . import DotsConfigEntry
-from .const import CONF_REFRESH_TOKEN
+from .const import CONF_LOCATION_ID, CONF_REFRESH_TOKEN
 from .kpis import newest_first
 
-TO_REDACT = {CONF_EMAIL, CONF_PASSWORD, CONF_REFRESH_TOKEN}
+TO_REDACT = {CONF_EMAIL, CONF_PASSWORD, CONF_REFRESH_TOKEN, CONF_LOCATION_ID}
 
 
 async def async_get_config_entry_diagnostics(
