@@ -104,7 +104,7 @@ def fit_params(
             energy.append(markup)
         settlement = _line(detail, "settlement injectie", kind="discount")
         injected = injection_kwh(detail)
-        if settlement is not None and injected and not m.invalid_out:
+        if settlement is not None and injected and usage.kwh_out is not None and not m.invalid_out:
             markup = _markup(abs(settlement.amount) / injected, usage.kwh_out, usage.priced_out)
             if markup is not None:
                 injection.append(markup)

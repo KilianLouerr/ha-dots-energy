@@ -190,3 +190,11 @@ def test_derive_rules_ignores_credit_notes():
     credit = detail(invoice_id=2, period="2026-02", energy_price=0.5, invoice_type="out_refund")
     rules = derive_rules([regular, credit], breakdowns(regular, credit))
     assert rules.energy_unit_price == D("0.12")
+
+
+def test_injection_without_source_falls_back_per_day():
+    rules, _ = _rules(period="2026-01", kwh_out=62, injection_price=0.10)
+    bill = price_month(usage(kwh_out=None, days=D(10)), rules, FitParams())
+    assert _line(bill, "Settlement injectie totale uren").amount == D("-2.00")
+    assert _line(bill, "Evenwichtsbijdrage injectie").amount == D("0.10")
+    assert "injectie" in bill.missing

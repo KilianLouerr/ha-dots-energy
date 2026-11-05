@@ -146,3 +146,15 @@ def test_invalid_hours_counted_per_series():
     usage, invalid = usage_until_by_series(ctx, now)
     assert invalid == {"afname": 0, "injectie": 1, "gestuurd": 0}
     assert usage.kwh_out == 58
+
+
+def test_no_injection_source_marks_injection_missing():
+    now = datetime(2026, 1, 10, 0, 0, tzinfo=TZ)
+    result = forecast(_ctx(now, injectie=None), _rules(), FitParams())
+    settlement = next(
+        line
+        for line in result.expected.lines
+        if line.description == "Settlement injectie totale uren"
+    )
+    assert settlement.amount < 0
+    assert "injectie" in result.missing

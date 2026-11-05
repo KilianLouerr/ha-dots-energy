@@ -36,6 +36,7 @@ class Rule:
     basis: Basis
     rate: Decimal
     taxable: bool
+    day_rate: Decimal = ZERO  # amount per day on the source invoice (fallback)
 
 
 @dataclass(frozen=True)
@@ -68,7 +69,7 @@ class MonthUsage:
     days: Decimal
     days_in_month: int
     kwh_in: Decimal
-    kwh_out: Decimal
+    kwh_out: Decimal | None  # None: injection not measured
     priced_in: tuple[Decimal, Decimal]
     priced_out: tuple[Decimal, Decimal]
     capacity_kw: Decimal | None
@@ -201,6 +202,7 @@ def derive_rules(
                 basis=basis,
                 rate=rate,
                 taxable=line.kind == "charge" and basis != "kwh_out",
+                day_rate=line.amount / days if basis in ("injection", "kwh_out") else ZERO,
             )
     flex_days = []
     for detail in recent:
@@ -249,7 +251,12 @@ def price_month(usage: MonthUsage, rules: TariffRules, params: FitParams) -> Bil
     for rule in rules.rules:
         quantity: Decimal | None
         unit: Decimal | None
-        if rule.basis == "energy":
+        if rule.basis in ("injection", "kwh_out") and usage.kwh_out is None:
+            quantity, unit = usage.days, rule.day_rate
+            raw = quantity * unit
+            if rule.day_rate:
+                missing.add("injectie")
+        elif rule.basis == "energy":
             raw = _market(
                 usage.kwh_in,
                 usage.priced_in,

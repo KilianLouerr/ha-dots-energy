@@ -281,7 +281,7 @@ class DotsForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
         days = Decimal(usage.days_in_month)
         return MonthMeasuredDaily(
             kwh_in_per_day=usage.kwh_in / days,
-            kwh_out_per_day=usage.kwh_out / days,
+            kwh_out_per_day=(usage.kwh_out or Decimal(0)) / days,
             steered_per_day=usage.steered_kwh / days if usage.steered_kwh is not None else None,
         )
 

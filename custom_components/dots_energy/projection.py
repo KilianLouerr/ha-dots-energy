@@ -152,7 +152,7 @@ def usage_until_by_series(ctx: MonthContext, until: datetime) -> tuple[MonthUsag
         days=_local_days(ctx.month_start, until),
         days_in_month=_days_in_month(ctx.month_start),
         kwh_in=sum(afname.values(), ZERO),
-        kwh_out=sum(injectie.values(), ZERO),
+        kwh_out=sum(injectie.values(), ZERO) if ctx.injectie is not None else None,
         priced_in=_priced(afname, ctx.prices),
         priced_out=_priced(injectie, ctx.prices),
         capacity_kw=ctx.capacity_kw,
@@ -206,7 +206,8 @@ def forecast(ctx: MonthContext, rules: TariffRules, params: FitParams) -> Foreca
     remaining = [h for h in month_hours(ctx.month_start) if h not in closed]
     prev = ctx.previous
     in_hour = _per_hour(so_far_usage.kwh_in, elapsed, prev.kwh_in_per_day if prev else None)
-    out_hour = _per_hour(so_far_usage.kwh_out, elapsed, prev.kwh_out_per_day if prev else None)
+    kwh_out = so_far_usage.kwh_out
+    out_hour = _per_hour(kwh_out or ZERO, elapsed, prev.kwh_out_per_day if prev else None)
     steered = None
     if so_far_usage.steered_kwh is not None:
         steer_hour = _per_hour(
@@ -218,7 +219,7 @@ def forecast(ctx: MonthContext, rules: TariffRules, params: FitParams) -> Foreca
         days=Decimal(days_in_month),
         days_in_month=days_in_month,
         kwh_in=so_far_usage.kwh_in + in_hour * len(remaining),
-        kwh_out=so_far_usage.kwh_out + out_hour * len(remaining),
+        kwh_out=kwh_out + out_hour * len(remaining) if kwh_out is not None else None,
         priced_in=_remaining_priced(remaining, in_hour, so_far_usage.priced_in, ctx.prices),
         priced_out=_remaining_priced(remaining, out_hour, so_far_usage.priced_out, ctx.prices),
         capacity_kw=ctx.capacity_kw,
