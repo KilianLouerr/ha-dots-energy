@@ -53,5 +53,50 @@
       "cannot_connect": "Dots could not be reached. Try again later.",
       "no_locations": "No delivery address found on this Dots account."
     }
+  },
+  "entity": {
+    "sensor": {
+      "laatste_factuur": {
+        "name": "Last invoice"
+      },
+      "totaal_dit_jaar": {
+        "name": "Total this year"
+      },
+      "gemiddeld_per_maand": {
+        "name": "Average per month"
+      },
+      "all_in_prijs": {
+        "name": "All-in price"
+      },
+      "openstaand": {
+        "name": "Outstanding"
+      },
+      "gekozen_factuur": {
+        "name": "Selected invoice"
+      },
+      "maandoverzicht": {
+        "name": "Monthly overview"
+      },
+      "laatst_bijgewerkt": {
+        "name": "Last updated"
+      }
+    },
+    "select": {
+      "factuur": {
+        "name": "Invoice"
+      }
+    },
+    "event": {
+      "nieuwe_factuur": {
+        "name": "New invoice",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "nieuwe_factuur": "New invoice"
+            }
+          }
+        }
+      }
+    }
   }
 }

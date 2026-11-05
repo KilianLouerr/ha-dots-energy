@@ -115,3 +115,13 @@ def monthly_overview(
         row.update({c.value: float(a.quantize(Decimal("0.01"))) for c, a in amounts.items()})
         result.append(row)
     return result
+
+
+def newest_first(summaries: Iterable[InvoiceSummary]) -> list[InvoiceSummary]:
+    """Invoices ordered from the most recent period to the oldest."""
+    return sorted(summaries, key=lambda s: (s.period_start, s.invoice_date, s.id), reverse=True)
+
+
+def invoice_label(summary: InvoiceSummary) -> str:
+    """Label used in the invoice select, e.g. '2026-02 · TST00000102'."""
+    return f"{summary.period_start.strftime('%Y-%m')} · {summary.number}"

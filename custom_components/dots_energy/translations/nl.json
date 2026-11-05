@@ -53,5 +53,50 @@
       "cannot_connect": "Dots is niet bereikbaar. Probeer het later opnieuw.",
       "no_locations": "Geen leveringsadres gevonden op dit Dots-account."
     }
+  },
+  "entity": {
+    "sensor": {
+      "laatste_factuur": {
+        "name": "Laatste factuur"
+      },
+      "totaal_dit_jaar": {
+        "name": "Totaal dit jaar"
+      },
+      "gemiddeld_per_maand": {
+        "name": "Gemiddeld per maand"
+      },
+      "all_in_prijs": {
+        "name": "All-in prijs"
+      },
+      "openstaand": {
+        "name": "Openstaand"
+      },
+      "gekozen_factuur": {
+        "name": "Gekozen factuur"
+      },
+      "maandoverzicht": {
+        "name": "Maandoverzicht"
+      },
+      "laatst_bijgewerkt": {
+        "name": "Laatst bijgewerkt"
+      }
+    },
+    "select": {
+      "factuur": {
+        "name": "Factuur"
+      }
+    },
+    "event": {
+      "nieuwe_factuur": {
+        "name": "Nieuwe factuur",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "nieuwe_factuur": "Nieuwe factuur"
+            }
+          }
+        }
+      }
+    }
   }
 }
