@@ -64,8 +64,11 @@ Hoe ze rekent:
 
 - De tarieven komen uit je laatste facturen: prijzen per kWh (accijns, certificaten,
   evenwichtsbijdragen), vaste kosten per dag, btw.
-- Energie en injectie: je verbruik per uur maal de marktprijs van dat uur, plus een opslag die
-  geleerd wordt uit je vorige facturen. Zolang die opslag nog niet geleerd is, rekent ze met de
+- Energie en injectie: je verbruik per kwartier maal de marktprijs van dat kwartier (Dots
+  rekent per kwartier af), plus een opslag die geleerd wordt uit je vorige facturen. Het
+  verbruik per kwartier komt uit de 5-minutenstatistieken van Home Assistant, die maar enkele
+  dagen bewaard worden; de integratie houdt de kwartieren van de lopende en de vorige maand
+  daarom zelf bij. Voor oudere uren verdeelt ze het uurverbruik gelijk over de vier kwartieren. Zolang die opslag nog niet geleerd is, rekent ze met de
   eenheidsprijs van je laatste factuur.
 - Netkosten: het gemiddelde van je maandpieken over de laatste 12 maanden (capaciteitstarief)
   en je kWh, geleerd uit je facturen zodra er drie maanden met die gegevens zijn.
@@ -86,8 +89,9 @@ met uurstatistieken (`state_class` `total` of `total_increasing`):
 | Marktprijs per kWh (day-ahead) | nee | een sensor van een Nord Pool- of ENTSO-E-integratie |
 | Prijs is inclusief btw | nee | aan als de prijssensor btw bevat |
 
-De marktprijs wordt elk uur vastgelegd (een prijssensor bewaart zelf maar een paar dagen
-historiek). De opslag op de marktprijs kan dus pas geleerd worden na een volledige
+De marktprijs wordt per kwartier vastgelegd (een prijssensor bewaart zelf maar een paar dagen
+historiek). Sensoren met een attribuut `raw_today`/`raw_tomorrow` (zoals de Nord Pool-integratie)
+leveren de kwartierprijzen rechtstreeks. De opslag op de marktprijs kan dus pas geleerd worden na een volledige
 factuurmaand met vastgelegde prijzen.
 
 Ontbreekt er iets (prijs, meting, gegevens van de batterijsturing), dan blijft de voorspelling

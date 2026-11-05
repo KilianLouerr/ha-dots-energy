@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import json
 from datetime import timedelta
+from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from homeassistant.components.recorder import get_instance
+from homeassistant.components.recorder.db_schema import StatisticsShortTerm
 from homeassistant.components.recorder.models import (
     StatisticData,
     StatisticMeanType,
@@ -62,7 +65,9 @@ async def _import_hourly(hass, entity_id: str, start, end, kwh: float = 1.0) -> 
     await async_wait_recording_done(hass)
 
 
-async def _setup(hass, aioclient_mock, freezer, options, now: str = NOW) -> MockConfigEntry:
+async def _setup(
+    hass, aioclient_mock, freezer, options, now: str = NOW, entry_id: str | None = None
+) -> MockConfigEntry:
     await hass.config.async_update(time_zone="Europe/Brussels")
     freezer.move_to(now)
     _mock_api(aioclient_mock)
@@ -80,6 +85,7 @@ async def _setup(hass, aioclient_mock, freezer, options, now: str = NOW) -> Mock
             CONF_LOCATION_ID: 7,
         },
         options=options,
+        **({"entry_id": entry_id} if entry_id else {}),
     )
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -123,11 +129,12 @@ async def test_prices_recorded_hourly_into_store(
     freezer.move_to(next_run)
     async_fire_time_changed(hass, next_run)
     await hass.async_block_till_done()
-    coordinator = entry.runtime_data.forecast
-    await coordinator.async_flush()
-    prices = hass_storage[f"{DOMAIN}.{entry.entry_id}.forecast"]["data"]["prices"]
-    hour = next_run.replace(minute=0).astimezone(dt_util.UTC).isoformat()
-    assert prices[hour] == "0.1"
+    quarter = next_run.replace(minute=0).astimezone(dt_util.UTC)
+    assert entry.runtime_data.forecast.price_at(quarter) == Decimal("0.1")
+    await entry.runtime_data.forecast.async_flush()
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.runtime_data.forecast.price_at(quarter) == Decimal("0.1")
 
 
 async def test_snapshot_once_per_day_and_last_overwritten(hass, aioclient_mock, freezer) -> None:
@@ -148,7 +155,7 @@ async def test_month_rollover_starts_new_series(hass, aioclient_mock, freezer) -
         hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT}, now="2026-03-31 23:40:00+02:00"
     )
     coordinator = entry.runtime_data.forecast
-    freezer.move_to("2026-04-01 00:30:00+02:00")
+    freezer.move_to("2026-04-01 00:10:00+02:00")
     await coordinator.async_refresh()
     data = coordinator.data
     assert data.month == "2026-04"
@@ -237,6 +244,60 @@ async def test_closed_hour_price_is_time_weighted_average(
     async_fire_time_changed(hass, run)
     await hass.async_block_till_done()
     coordinator = entry.runtime_data.forecast
-    await coordinator.async_flush()
-    prices = hass_storage[f"{DOMAIN}.{entry.entry_id}.forecast"]["data"]["prices"]
-    assert prices[hour.astimezone(dt_util.UTC).isoformat()] == "0.15"
+    utc = hour.astimezone(dt_util.UTC)
+    assert coordinator.price_at(utc) == Decimal("0.1")
+    assert coordinator.price_at(utc + timedelta(minutes=15)) == Decimal("0.1")
+    assert coordinator.price_at(utc + timedelta(minutes=30)) == Decimal("0.2")
+
+
+def _short_term(hass, entity_id, sums, start):
+    metadata = StatisticMetaData(
+        mean_type=StatisticMeanType.NONE,
+        has_sum=True,
+        name=None,
+        source="recorder",
+        statistic_id=entity_id,
+        unit_class="energy",
+        unit_of_measurement="kWh",
+    )
+    rows = [
+        StatisticData(start=start + timedelta(minutes=5 * i), state=0, sum=value)
+        for i, value in enumerate(sums)
+    ]
+    get_instance(hass).async_import_statistics(metadata, rows, StatisticsShortTerm)
+
+
+async def test_quarters_recorded_from_five_minute_statistics(hass, aioclient_mock, freezer) -> None:
+    entry = await _setup(hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT})
+    start = dt_util.now().replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
+    before = start - timedelta(minutes=5)
+    _short_term(hass, IMPORT, [0, 0, 0, 0, 1.0, 1.5, 2.0], before)
+    await async_wait_recording_done(hass)
+    coordinator = entry.runtime_data.forecast
+    await coordinator.async_refresh()
+    utc = start.astimezone(dt_util.UTC)
+    assert coordinator.quarter_at(IMPORT, utc) == Decimal(0)
+    assert coordinator.quarter_at(IMPORT, utc + timedelta(minutes=15)) == Decimal(2)
+
+
+async def test_legacy_hourly_prices_are_expanded_to_quarters(
+    hass, aioclient_mock, freezer, hass_storage
+) -> None:
+    hour = "2026-03-20T09:00:00+00:00"
+    hass_storage[f"{DOMAIN}.legacy.forecast"] = {
+        "version": 1,
+        "key": f"{DOMAIN}.legacy.forecast",
+        "data": {"prices": {hour: "0.2", "2025-12-01T09:00:00+00:00": "0.3"}},
+    }
+    entry = await _setup(hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT}, entry_id="legacy")
+    coordinator = entry.runtime_data.forecast
+    base = dt_util.parse_datetime(hour)
+    assert coordinator.price_at(base + timedelta(minutes=45)) == Decimal("0.2")
+    assert coordinator.price_at(dt_util.parse_datetime("2025-12-01T09:00:00+00:00")) is None
+
+
+async def test_complete_months_are_kept_as_totals(hass, aioclient_mock, freezer) -> None:
+    entry = await _setup(hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT})
+    measured = entry.runtime_data.forecast.stored["measured"]
+    assert "2026-01" in measured
+    assert "2026-02" not in measured

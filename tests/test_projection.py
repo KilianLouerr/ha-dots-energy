@@ -7,12 +7,13 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from custom_components.dots_energy.projection import (
-    HourlySeries,
     MonthContext,
     MonthMeasuredDaily,
+    SlotSeries,
     cumulative_series,
     forecast,
-    month_hours,
+    merge_quarters,
+    month_slots,
     usage_until,
     usage_until_by_series,
 )
@@ -30,13 +31,14 @@ def _rules():
     return derive_rules([d], breakdowns(d))
 
 
-def _series(start: datetime, until: datetime, kwh=1, overrides=None) -> HourlySeries:
+def _series(start: datetime, until: datetime, kwh=1, overrides=None) -> SlotSeries:
+    """kwh per hour, as four equal quarters per hour."""
     values = {}
-    for h in month_hours(start):
-        if h + timedelta(hours=1) <= until:
-            values[h] = D(str(kwh))
+    for q in month_slots(start):
+        if q + timedelta(minutes=15) <= until:
+            values[q] = D(str(kwh)) / 4
     values.update(overrides or {})
-    return HourlySeries(values=values)
+    return SlotSeries(values=values)
 
 
 def _ctx(now, *, kwh=1, overrides=None, prices=None, previous=None, injectie=None):
@@ -56,31 +58,37 @@ def _energy(bill):
     return next(line for line in bill.lines if line.description == "Elektriciteit totale uren")
 
 
-def test_month_hours_counts():
-    assert len(month_hours(JAN)) == 744
-    assert len(month_hours(datetime(2026, 3, 1, tzinfo=TZ))) == 743
-    assert all(h.tzinfo == UTC for h in month_hours(JAN))
+def test_month_slots_counts():
+    assert len(month_slots(JAN)) == 744 * 4
+    assert len(month_slots(datetime(2026, 3, 1, tzinfo=TZ))) == 743 * 4
+    assert all(q.tzinfo == UTC for q in month_slots(JAN))
 
 
-def test_october_has_745_hours():
-    hours = month_hours(datetime(2026, 10, 1, tzinfo=TZ))
-    assert len(hours) == 745
-    assert len(set(hours)) == 745
+def test_october_has_745_hours_of_quarters():
+    slots = month_slots(datetime(2026, 10, 1, tzinfo=TZ))
+    assert len(slots) == 745 * 4
+    assert len(set(slots)) == 745 * 4
 
 
-def test_so_far_counts_only_closed_hours():
-    now = datetime(2026, 1, 3, 10, 30, tzinfo=TZ)
+def test_spread_hourly_splits_in_four_quarters():
+    hour = datetime(2026, 1, 1, 10, tzinfo=UTC)
+    spread = merge_quarters({hour: D(2)}, {})
+    assert spread == {hour + timedelta(minutes=15 * i): D("0.5") for i in range(4)}
+
+
+def test_so_far_counts_only_closed_quarters():
+    now = datetime(2026, 1, 3, 10, 40, tzinfo=TZ)
     ctx = _ctx(now)
     usage, invalid = usage_until(ctx, datetime(2026, 1, 3, 10, tzinfo=TZ))
     assert usage.kwh_in == 58
     assert usage.days == D(58) / 24
     assert invalid == 0
-    assert forecast(ctx, _rules(), FitParams()).elapsed_days == D(58) / 24
+    assert forecast(ctx, _rules(), FitParams()).elapsed_days == D("58.5") / 24
 
 
 def test_projection_discards_reset_hour():
     now = datetime(2026, 1, 3, 10, 0, tzinfo=TZ)
-    bad = datetime(2026, 1, 2, 5, tzinfo=TZ).astimezone(UTC)
+    bad = datetime(2026, 1, 2, 5, 15, tzinfo=TZ).astimezone(UTC)
     ctx = _ctx(now, overrides={bad: D(-5000)})
     usage, invalid = usage_until(ctx, now)
     assert invalid == 1
@@ -98,8 +106,8 @@ def test_missing_hour_is_filled():
     assert usage.kwh_in == 58
 
 
-def test_day_one_before_first_hour():
-    now = datetime(2026, 1, 1, 0, 30, tzinfo=TZ)
+def test_day_one_before_first_quarter():
+    now = datetime(2026, 1, 1, 0, 10, tzinfo=TZ)
     previous = MonthMeasuredDaily(kwh_in_per_day=D(10), kwh_out_per_day=D(0), steered_per_day=None)
     result = forecast(_ctx(now, previous=previous), _rules(), FitParams())
     assert result.so_far.total == 0
@@ -119,10 +127,11 @@ def test_expected_blends_previous_month():
 def test_expected_uses_known_future_prices():
     now = datetime(2026, 1, 31, 22, 0, tzinfo=TZ)
     late = datetime(2026, 1, 31, 22, tzinfo=TZ).astimezone(UTC)
-    prices = {h: D("0.10") for h in month_hours(JAN) if h + timedelta(hours=1) <= now}
+    prices = {q: D("0.10") for q in month_slots(JAN) if q + timedelta(minutes=15) <= now}
     prices[late] = D("0.50")
     result = forecast(_ctx(now, prices=prices), _rules(), FitParams(energy_markup=D(0)))
-    assert _energy(result.expected).amount == D("74.80")
+    # 742 kWh at 0.10, then 8 remaining quarters of 0.25 kWh: one at 0.50, seven at 0.10
+    assert _energy(result.expected).amount == D("74.50")
     assert "marktprijs" not in result.expected.missing
 
 
@@ -158,3 +167,47 @@ def test_no_injection_source_marks_injection_missing():
     )
     assert settlement.amount < 0
     assert "injectie" in result.missing
+
+
+def test_quarter_prices_weight_quarter_usage():
+    """Usage in the cheap quarter of an hour is priced at that quarter, not the hour average."""
+    now = datetime(2026, 1, 1, 1, 0, tzinfo=TZ)
+    q0 = datetime(2026, 1, 1, 0, 0, tzinfo=TZ).astimezone(UTC)
+    quarters = [q0 + timedelta(minutes=15 * i) for i in range(4)]
+    afname = SlotSeries(values={quarters[0]: D(4), **{q: D(0) for q in quarters[1:]}})
+    prices = {quarters[0]: D("0.05"), **{q: D("0.25") for q in quarters[1:]}}
+    ctx = MonthContext(
+        month_start=JAN,
+        now=now,
+        afname=afname,
+        injectie=None,
+        gestuurd=None,
+        prices=prices,
+        capacity_kw=None,
+        previous=None,
+    )
+    usage, _ = usage_until(ctx, now)
+    assert usage.priced_in == (D(4), D("0.20"))
+
+
+def test_slot_above_limit_is_invalid():
+    now = datetime(2026, 1, 1, 1, 0, tzinfo=TZ)
+    q0 = datetime(2026, 1, 1, 0, 0, tzinfo=TZ).astimezone(UTC)
+    ctx = _ctx(now, overrides={q0: D(13)})
+    _, invalid = usage_until(ctx, now)
+    assert invalid == 1
+
+
+def test_merge_hourly_with_partial_quarters_keeps_hour_total():
+    hour = datetime(2026, 1, 1, 10, tzinfo=UTC)
+    q = timedelta(minutes=15)
+    merged = merge_quarters({hour: D(2)}, {hour: D("1.4")})
+    assert merged[hour] == D("1.4")
+    assert [merged[hour + q * i] for i in (1, 2, 3)] == [D("0.2")] * 3
+    assert sum(merged.values()) == D(2)
+
+
+def test_merge_quarters_without_hourly_value():
+    hour = datetime(2026, 1, 1, 10, tzinfo=UTC)
+    merged = merge_quarters({}, {hour + timedelta(minutes=30): D("0.7")})
+    assert merged == {hour + timedelta(minutes=30): D("0.7")}
