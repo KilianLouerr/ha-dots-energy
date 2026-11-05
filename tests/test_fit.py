@@ -22,6 +22,8 @@ def measured(
     capacity=None,
     steered=None,
     invalid=0,
+    invalid_out=0,
+    invalid_steered=0,
 ) -> MonthMeasured:
     k_in, k_out = D(str(kwh_in)), D(str(kwh_out))
     return MonthMeasured(
@@ -37,6 +39,8 @@ def measured(
             steered_kwh=None if steered is None else D(str(steered)),
         ),
         invalid_hours=invalid,
+        invalid_out=invalid_out,
+        invalid_steered=invalid_steered,
     )
 
 
@@ -126,4 +130,24 @@ def test_nothing_measured_gives_empty_params():
     jan = detail(period="2026-01")
     params = fit_params([jan], breakdowns(jan), {})
     assert params.energy_markup is None
+    assert params.flex_per_kwh is None
+
+
+def test_gap_in_injection_only_blocks_injection_markup():
+    jan = detail(period="2026-01", energy_price=0.15, injection_price=0.10)
+    m = {
+        "2026-01": measured(
+            "2026-01", priced_in=(D(200), D(24)), priced_out=(D(50), D(4)), invalid_out=3
+        )
+    }
+    params = fit_params([jan], breakdowns(jan), m)
+    assert params.energy_markup == D("0.03")
+    assert params.injection_markup is None
+
+
+def test_gap_in_steered_only_blocks_flex():
+    jan = detail(period="2026-01", energy_price=0.15, flex=6.0)
+    m = {"2026-01": measured("2026-01", priced_in=(D(200), D(24)), steered=150, invalid_steered=1)}
+    params = fit_params([jan], breakdowns(jan), m)
+    assert params.energy_markup == D("0.03")
     assert params.flex_per_kwh is None

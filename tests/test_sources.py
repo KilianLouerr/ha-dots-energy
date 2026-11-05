@@ -126,3 +126,25 @@ async def test_capacity_kw(hass) -> None:
     hass.states.async_set("sensor.my_capacity_average", "unknown")
     assert capacity_kw(hass, "sensor.my_capacity_average") is None
     assert capacity_kw(hass, None) is None
+
+
+async def test_hourly_changes_converts_wh_to_kwh(recorder_mock, hass) -> None:
+    metadata = StatisticMetaData(
+        mean_type=StatisticMeanType.NONE,
+        has_sum=True,
+        name=None,
+        source="recorder",
+        statistic_id="sensor.my_grid_import_wh",
+        unit_class="energy",
+        unit_of_measurement="Wh",
+    )
+    rows = [
+        StatisticData(start=START + timedelta(hours=i), state=0, sum=float(i * 1500))
+        for i in range(3)
+    ]
+    async_import_statistics(hass, metadata, rows)
+    await async_wait_recording_done(hass)
+    series = await async_hourly_changes(
+        hass, "sensor.my_grid_import_wh", START, START + timedelta(hours=3)
+    )
+    assert series.values[START + timedelta(hours=2)] == D("1.5")

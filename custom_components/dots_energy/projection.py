@@ -135,11 +135,18 @@ def _measure(ctx: MonthContext, until: datetime):
     afname, bad_in = _filled(ctx.afname, hours, tz)
     injectie, bad_out = _filled(ctx.injectie, hours, tz)
     gestuurd, bad_steer = _filled(ctx.gestuurd, hours, tz)
-    return hours, afname, injectie, gestuurd, bad_in + bad_out + bad_steer
+    invalid = {"afname": bad_in, "injectie": bad_out, "gestuurd": bad_steer}
+    return hours, afname, injectie, gestuurd, invalid
 
 
 def usage_until(ctx: MonthContext, until: datetime) -> tuple[MonthUsage, int]:
     """Usage of the closed hours before `until`, and the number of filled hours."""
+    usage, invalid = usage_until_by_series(ctx, until)
+    return usage, sum(invalid.values())
+
+
+def usage_until_by_series(ctx: MonthContext, until: datetime) -> tuple[MonthUsage, dict[str, int]]:
+    """Like usage_until, with the filled hours counted per series."""
     _, afname, injectie, gestuurd, invalid = _measure(ctx, until)
     usage = MonthUsage(
         days=_local_days(ctx.month_start, until),

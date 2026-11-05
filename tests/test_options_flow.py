@@ -77,3 +77,12 @@ async def test_options_change_reloads_entry(hass, entry) -> None:
         await hass.config_entries.options.async_configure(result["flow_id"], SOURCES)
         await hass.async_block_till_done()
     reload.assert_called_once_with(entry.entry_id)
+
+
+async def test_token_rotation_does_not_reload_entry(hass, entry) -> None:
+    with patch.object(hass.config_entries, "async_reload", AsyncMock(return_value=True)) as reload:
+        hass.config_entries.async_update_entry(
+            entry, data={**entry.data, CONF_REFRESH_TOKEN: "RT-rotated"}
+        )
+        await hass.async_block_till_done()
+    reload.assert_not_called()

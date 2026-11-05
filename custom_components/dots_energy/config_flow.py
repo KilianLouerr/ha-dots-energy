@@ -14,7 +14,7 @@ from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
-    OptionsFlow,
+    OptionsFlowWithReload,
 )
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import callback
@@ -267,7 +267,7 @@ def _options_schema(current: Mapping[str, Any]) -> vol.Schema:
     )
 
 
-class DotsOptionsFlow(OptionsFlow):
+class DotsOptionsFlow(OptionsFlowWithReload):
     """Choose the Home Assistant sensors the forecast reads."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:

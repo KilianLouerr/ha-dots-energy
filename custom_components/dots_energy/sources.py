@@ -44,7 +44,14 @@ async def async_hourly_changes(
 ) -> HourlySeries:
     """Hourly 'change' of a statistic between start and end (UTC hours)."""
     rows = await get_instance(hass).async_add_executor_job(
-        statistics_during_period, hass, start, end, {entity_id}, "hour", None, {"change"}
+        statistics_during_period,
+        hass,
+        start,
+        end,
+        {entity_id},
+        "hour",
+        {"energy": "kWh"},
+        {"change"},
     )
     values: dict[datetime, Decimal] = {}
     for row in rows.get(entity_id, []):

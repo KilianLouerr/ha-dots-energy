@@ -37,6 +37,7 @@ from .projection import (
     cumulative_series,
     forecast,
     usage_until,
+    usage_until_by_series,
 )
 from .sources import async_hourly_changes, async_price_history, capacity_kw, current_price
 from .tariff import Bill, FitParams, TariffRules, derive_rules
@@ -301,8 +302,14 @@ class DotsForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
                 if key == prev_key
                 else await self._async_context(options, start, shift_month(start, 1), None)
             )
-            usage, invalid = usage_until(ctx, ctx.now)
-            measured[key] = MonthMeasured(month=key, usage=usage, invalid_hours=invalid)
+            usage, invalid = usage_until_by_series(ctx, ctx.now)
+            measured[key] = MonthMeasured(
+                month=key,
+                usage=usage,
+                invalid_hours=invalid["afname"],
+                invalid_out=invalid["injectie"],
+                invalid_steered=invalid["gestuurd"],
+            )
             if key != prev_key:
                 self._measured[key] = measured[key]
         return fit_params(details, data.breakdowns, measured)

@@ -25,7 +25,9 @@ class MonthMeasured:
 
     month: str
     usage: MonthUsage
-    invalid_hours: int
+    invalid_hours: int  # import (afname) hours missing or discarded
+    invalid_out: int = 0  # injection hours missing or discarded
+    invalid_steered: int = 0  # steered-kWh hours missing or discarded
 
 
 def eligible(measured: MonthMeasured, detail: InvoiceDetail) -> bool:
@@ -102,7 +104,7 @@ def fit_params(
             energy.append(markup)
         settlement = _line(detail, "settlement injectie", kind="discount")
         injected = injection_kwh(detail)
-        if settlement is not None and injected:
+        if settlement is not None and injected and not m.invalid_out:
             markup = _markup(abs(settlement.amount) / injected, usage.kwh_out, usage.priced_out)
             if markup is not None:
                 injection.append(markup)
@@ -110,7 +112,7 @@ def fit_params(
         billed = afname_kwh(detail)
         if transport_line is not None and usage.capacity_kw is not None and billed:
             transport.append((usage.capacity_kw, billed, transport_line.amount))
-        if usage.steered_kwh is not None and usage.steered_kwh > 0:
+        if usage.steered_kwh is not None and usage.steered_kwh > 0 and not m.invalid_steered:
             b = breakdowns.get(detail.summary.id) or breakdown(detail)
             flex_amount += -b.amounts[Category.VERGOEDINGEN]
             flex_kwh += usage.steered_kwh

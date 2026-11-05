@@ -14,6 +14,7 @@ from custom_components.dots_energy.projection import (
     forecast,
     month_hours,
     usage_until,
+    usage_until_by_series,
 )
 from custom_components.dots_energy.tariff import FitParams, derive_rules
 
@@ -135,3 +136,13 @@ def test_cumulative_series_is_non_decreasing_without_injection():
     result = forecast(ctx, _rules(), FitParams())
     assert result.daily[:-1] == series
     assert result.daily[-1] == (10, result.so_far.total)
+
+
+def test_invalid_hours_counted_per_series():
+    now = datetime(2026, 1, 3, 10, 0, tzinfo=TZ)
+    bad = datetime(2026, 1, 2, 5, tzinfo=TZ).astimezone(UTC)
+    out = _series(JAN, now, 1, {bad: D(-3)})
+    ctx = _ctx(now, injectie=out)
+    usage, invalid = usage_until_by_series(ctx, now)
+    assert invalid == {"afname": 0, "injectie": 1, "gestuurd": 0}
+    assert usage.kwh_out == 58
