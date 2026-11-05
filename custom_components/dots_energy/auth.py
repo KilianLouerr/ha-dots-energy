@@ -17,6 +17,7 @@ import logging
 import re
 import secrets
 from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -93,7 +94,9 @@ class DotsAuth:
         password: str | None,
         refresh_token: str | None,
         on_tokens: Callable[[TokenSet], None],
-        login_session_factory: Callable[[], aiohttp.ClientSession] | None = None,
+        login_session_factory: (
+            Callable[[], AbstractAsyncContextManager[aiohttp.ClientSession]] | None
+        ) = None,
     ) -> None:
         self._session = session
         self._login_session_factory = login_session_factory or _default_login_session

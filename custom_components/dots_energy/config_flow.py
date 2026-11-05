@@ -8,14 +8,10 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
-import aiohttp
 import voluptuous as vol
 from homeassistant.config_entries import SOURCE_REAUTH, ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
-from homeassistant.helpers.aiohttp_client import (
-    async_create_clientsession,
-    async_get_clientsession,
-)
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
@@ -27,6 +23,7 @@ from homeassistant.helpers.selector import (
 from .api import ApiError, DotsApiClient
 from .auth import AuthError, CannotConnect, CaptchaRequired, DotsAuth, InvalidCredentials, TokenSet
 from .const import CONF_LOCATION_ID, CONF_REFRESH_TOKEN, DOMAIN
+from .session import ha_login_session
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -77,9 +74,7 @@ class DotsConfigFlow(ConfigFlow, domain=DOMAIN):
             password=password or None,
             refresh_token=refresh_token,
             on_tokens=self._on_tokens,
-            login_session_factory=lambda: async_create_clientsession(
-                hass, auto_cleanup=False, cookie_jar=aiohttp.CookieJar()
-            ),
+            login_session_factory=lambda: ha_login_session(hass),
         )
 
     async def _async_try_password(

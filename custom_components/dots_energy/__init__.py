@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_create_clientsession, async_get_clientsession
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import DotsApiClient
 from .auth import DotsAuth, TokenSet
 from .const import CONF_LOCATION_ID, CONF_REFRESH_TOKEN
 from .coordinator import DotsCoordinator
+from .session import ha_login_session
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.SELECT, Platform.EVENT]
 
@@ -34,9 +34,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DotsConfigEntry) -> bool
         password=entry.data.get(CONF_PASSWORD) or None,
         refresh_token=entry.data.get(CONF_REFRESH_TOKEN) or None,
         on_tokens=on_tokens,
-        login_session_factory=lambda: async_create_clientsession(
-            hass, auto_cleanup=False, cookie_jar=aiohttp.CookieJar()
-        ),
+        login_session_factory=lambda: ha_login_session(hass),
     )
     coordinator = DotsCoordinator(
         hass, entry, DotsApiClient(session, auth), int(entry.data[CONF_LOCATION_ID])
