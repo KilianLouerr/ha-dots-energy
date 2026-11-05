@@ -23,6 +23,13 @@ CONF_LOCATION_ID = "location_id"
 
 EVENT_NEW_INVOICE = "dots_energy_new_invoice"
 
+OPT_AFNAME = "afname_entity"
+OPT_INJECTIE = "injectie_entity"
+OPT_CAPACITEIT = "capaciteit_entity"
+OPT_GESTUURD = "gestuurd_entities"
+OPT_PRIJS = "prijs_entity"
+OPT_PRIJS_INCL_BTW = "prijs_incl_btw"
+
 
 class Category(StrEnum):
     """Invoice cost categories, in display order."""

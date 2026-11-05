@@ -107,5 +107,21 @@
         }
       }
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Forecast: sources",
+        "description": "Pick sensors that have hourly statistics. Without grid import there is no forecast.",
+        "data": {
+          "afname_entity": "Grid import (kWh)",
+          "injectie_entity": "Grid export (kWh)",
+          "capaciteit_entity": "Average monthly peak over the last 12 months (kW)",
+          "gestuurd_entities": "kWh traded by the battery steering (flexibility)",
+          "prijs_entity": "Market price per kWh (day-ahead)",
+          "prijs_incl_btw": "The price includes VAT"
+        }
+      }
+    }
   }
 }

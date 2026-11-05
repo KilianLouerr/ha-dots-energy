@@ -107,5 +107,21 @@
         }
       }
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Voorspelling: bronnen",
+        "description": "Kies sensoren met uurstatistieken. Zonder afname is er geen voorspelling.",
+        "data": {
+          "afname_entity": "Afname van het net (kWh)",
+          "injectie_entity": "Injectie in het net (kWh)",
+          "capaciteit_entity": "Gemiddelde maandpiek laatste 12 maanden (kW)",
+          "gestuurd_entities": "Door de batterijsturing verhandelde kWh (flexibiliteit)",
+          "prijs_entity": "Marktprijs per kWh (day-ahead)",
+          "prijs_incl_btw": "Prijs is inclusief btw"
+        }
+      }
+    }
   }
 }

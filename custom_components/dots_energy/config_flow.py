@@ -9,10 +9,20 @@ from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import SOURCE_REAUTH, ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import (
+    SOURCE_REAUTH,
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
+from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    BooleanSelector,
+    EntitySelector,
+    EntitySelectorConfig,
     SelectSelector,
     SelectSelectorConfig,
     TextSelector,
@@ -22,7 +32,18 @@ from homeassistant.helpers.selector import (
 
 from .api import ApiError, DotsApiClient
 from .auth import AuthError, CannotConnect, CaptchaRequired, DotsAuth, InvalidCredentials, TokenSet
-from .const import CONF_LOCATION_ID, CONF_REFRESH_TOKEN, DOMAIN, REDIRECT_URI
+from .const import (
+    CONF_LOCATION_ID,
+    CONF_REFRESH_TOKEN,
+    DOMAIN,
+    OPT_AFNAME,
+    OPT_CAPACITEIT,
+    OPT_GESTUURD,
+    OPT_INJECTIE,
+    OPT_PRIJS,
+    OPT_PRIJS_INCL_BTW,
+    REDIRECT_URI,
+)
 from .session import ha_login_session
 
 _LOGGER = logging.getLogger(__name__)
@@ -55,6 +76,12 @@ class DotsConfigFlow(ConfigFlow, domain=DOMAIN):
     """Set up Dots Energy with e-mail and password, or a refresh token."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> DotsOptionsFlow:
+        """Options: the sources of the forecast."""
+        return DotsOptionsFlow()
 
     def __init__(self) -> None:
         self._email = ""
@@ -215,4 +242,38 @@ class DotsConfigFlow(ConfigFlow, domain=DOMAIN):
             return await self._async_try_password(user_input, "reauth_confirm")
         return self.async_show_form(
             step_id="reauth_confirm", data_schema=_credentials_schema(self._email)
+        )
+
+
+def _options_schema(current: Mapping[str, Any]) -> vol.Schema:
+    sensor = EntitySelector(EntitySelectorConfig(domain="sensor"))
+
+    def opt(key: str) -> vol.Optional:
+        return vol.Optional(key, description={"suggested_value": current.get(key)})
+
+    return vol.Schema(
+        {
+            opt(OPT_AFNAME): sensor,
+            opt(OPT_INJECTIE): sensor,
+            opt(OPT_CAPACITEIT): EntitySelector(
+                EntitySelectorConfig(domain=["sensor", "input_number"])
+            ),
+            opt(OPT_GESTUURD): EntitySelector(EntitySelectorConfig(domain="sensor", multiple=True)),
+            opt(OPT_PRIJS): sensor,
+            vol.Optional(
+                OPT_PRIJS_INCL_BTW, default=bool(current.get(OPT_PRIJS_INCL_BTW, False))
+            ): BooleanSelector(),
+        }
+    )
+
+
+class DotsOptionsFlow(OptionsFlow):
+    """Choose the Home Assistant sensors the forecast reads."""
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Single step with all sources."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+        return self.async_show_form(
+            step_id="init", data_schema=_options_schema(self.config_entry.options)
         )
