@@ -83,11 +83,13 @@ def test_credit_note_subtracts_in_same_month() -> None:
 
 def test_kpis_warn_once_for_unknown_status_and_type(caplog) -> None:
     summaries, details = _data()
-    summaries[0] = dataclasses.replace(summaries[0], status="overdue", invoice_type="deposit")
+    summaries[0] = dataclasses.replace(
+        summaries[0], status="status_only_here", invoice_type="type_only_here"
+    )
 
     compute_kpis(summaries, details, today=date(2026, 3, 30))
     compute_kpis(summaries, details, today=date(2026, 3, 30))
 
-    assert caplog.text.count("overdue") == 1
-    assert caplog.text.count("deposit") == 1
+    assert caplog.text.count("status_only_here") == 1
+    assert caplog.text.count("type_only_here") == 1
     assert "TST0000" not in caplog.text
