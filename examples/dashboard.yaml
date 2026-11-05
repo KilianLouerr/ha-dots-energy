@@ -1,0 +1,229 @@
+# Dashboard 'Facturen' voor de Dots Energy-integratie.
+# Vereist apexcharts-card (HACS). Plak dit in een nieuw dashboard via 'Ruwe configuratie-editor'.
+views:
+- title: Facturen
+  path: facturen
+  type: sections
+  max_columns: 2
+  icon: mdi:receipt-text
+  sections:
+  - type: grid
+    column_span: 2
+    cards:
+    - type: heading
+      heading: Facturen
+      heading_style: title
+      icon: mdi:receipt-text
+      badges:
+      - type: entity
+        entity: sensor.dots_energy_laatst_bijgewerkt
+        show_state: true
+        show_icon: true
+        icon: mdi:cloud-check-outline
+        color: green
+        tap_action:
+          action: more-info
+        visibility:
+        - condition: template
+          value_template: '{{ has_value(''sensor.dots_energy_laatst_bijgewerkt'') and now() - as_datetime(states(''sensor.dots_energy_laatst_bijgewerkt'')) < timedelta(hours=24) }}'
+      - type: entity
+        entity: sensor.dots_energy_laatst_bijgewerkt
+        show_state: true
+        show_icon: true
+        icon: mdi:cloud-alert-outline
+        color: orange
+        tap_action:
+          action: more-info
+        visibility:
+        - condition: template
+          value_template: '{{ not has_value(''sensor.dots_energy_laatst_bijgewerkt'') or now() - as_datetime(states(''sensor.dots_energy_laatst_bijgewerkt'')) >= timedelta(hours=24) }}'
+    - type: tile
+      entity: sensor.dots_energy_laatste_factuur
+      name: Laatste factuur
+      icon: mdi:receipt-text-outline
+      color: deep-purple
+      grid_options:
+        columns: 6
+    - type: tile
+      entity: sensor.dots_energy_totaal_dit_jaar
+      name: Totaal dit jaar
+      icon: mdi:calendar-range
+      color: blue
+      grid_options:
+        columns: 6
+    - type: tile
+      entity: sensor.dots_energy_gemiddeld_per_maand
+      name: Gemiddeld per maand
+      icon: mdi:chart-bell-curve-cumulative
+      color: teal
+      grid_options:
+        columns: 6
+    - type: tile
+      entity: sensor.dots_energy_all_in_prijs
+      name: All-in per kWh
+      icon: mdi:flash
+      color: amber
+      grid_options:
+        columns: 6
+    - type: custom:apexcharts-card
+      grid_options:
+        columns: full
+        rows: auto
+      graph_span: 9month
+      span:
+        end: month
+      stacked: true
+      header:
+        show: true
+        title: Kost per maand
+        show_states: false
+      apex_config:
+        chart:
+          height: 340
+          width: 100%
+          redrawOnParentResize: true
+        plotOptions:
+          bar:
+            columnWidth: 55%
+            borderRadius: 2
+        legend:
+          show: true
+          position: bottom
+          horizontalAlign: center
+          clusterGroupedSeries: false
+        xaxis:
+          labels:
+            format: MMM
+        tooltip:
+          shared: true
+          intersect: false
+        dataLabels:
+          enabled: false
+        markers:
+          size:
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 0
+          - 3
+        yaxis:
+          forceNiceScale: true
+          labels:
+            formatter: EVAL:(v) => '€ ' + Math.round(v)
+      all_series_config:
+        type: column
+        show:
+          legend_value: false
+          in_header: false
+      series:
+      - entity: sensor.dots_energy_maandoverzicht
+        name: Energie
+        color: '#7F77DD'
+        stack_group: kost
+        extend_to: false
+        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.energie]);
+      - entity: sensor.dots_energy_maandoverzicht
+        name: Netkosten
+        color: '#1D9E75'
+        stack_group: kost
+        extend_to: false
+        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.netkosten]);
+      - entity: sensor.dots_energy_maandoverzicht
+        name: Heffingen
+        color: '#D4537E'
+        stack_group: kost
+        extend_to: false
+        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.heffingen]);
+      - entity: sensor.dots_energy_maandoverzicht
+        name: Vaste kosten
+        color: '#888780'
+        stack_group: kost
+        extend_to: false
+        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.vaste_kosten]);
+      - entity: sensor.dots_energy_maandoverzicht
+        name: Btw
+        color: '#EF9F27'
+        stack_group: kost
+        extend_to: false
+        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.btw]);
+      - entity: sensor.dots_energy_maandoverzicht
+        name: Injectie
+        color: '#378ADD'
+        stack_group: kost
+        extend_to: false
+        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.injectie]);
+      - entity: sensor.dots_energy_maandoverzicht
+        name: Vergoedingen
+        color: '#5DCAA5'
+        stack_group: kost
+        extend_to: false
+        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.vergoedingen]);
+      - entity: sensor.dots_energy_maandoverzicht
+        name: Overig
+        color: '#B4B2A9'
+        stack_group: kost
+        extend_to: false
+        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.overig]);
+      - entity: sensor.dots_energy_maandoverzicht
+        name: Totaal
+        type: line
+        color: '#5F5E5A'
+        stroke_width: 2
+        curve: straight
+        extend_to: false
+        show:
+          in_chart: true
+        data_generator: return entity.attributes.maanden.map(m => [new Date(m.maand + '-15T00:00:00').getTime(), m.totaal]);
+  - type: grid
+    cards:
+    - type: heading
+      heading: Factuur in detail
+      heading_style: title
+      icon: mdi:file-document-outline
+    - type: tile
+      entity: select.dots_energy_factuur
+      name: Kies een factuur
+      icon: mdi:file-search-outline
+      color: deep-purple
+      hide_state: true
+      features:
+      - type: select-options
+      grid_options:
+        columns: full
+    - type: markdown
+      grid_options:
+        columns: full
+      content: |-
+        {% set f = 'sensor.dots_energy_gekozen_factuur' %}{% set regels = state_attr(f, 'regels') or [] %}{% set namen = {'energie': 'Energie', 'netkosten': 'Netkosten', 'heffingen': 'Heffingen', 'vaste_kosten': 'Vaste kosten', 'btw': 'Btw', 'injectie': 'Injectie', 'vergoedingen': 'Vergoedingen', 'overig': 'Overig'} %}{% macro eur(x) %}€ {{ '%.2f' | format(x | float(0)) | replace('.', ',') }}{% endmacro %}**{{ state_attr(f, 'factuurnummer') }}** · {{ 'betaald' if state_attr(f, 'status') == 'paid' else 'in behandeling' if state_attr(f, 'status') == 'pending' else state_attr(f, 'status') }}
+
+        | Regel | | Bedrag |
+        |:--|--:|--:|
+        {% for r in regels if r.categorie != 'afronding' and r.bedrag != 0 %}| {{ 'Btw ' ~ r.omschrijving if r.categorie == 'btw' else r.omschrijving }} | {% if r.hoeveelheid is not none and r.eenheidsprijs is not none and r.hoeveelheid != 1 and r.categorie != 'btw' %}{{ (r.hoeveelheid | round(3)) | string | replace('.', ',') }} × {{ r.eenheidsprijs | string | replace('.', ',') }}{% endif %} | {{ eur(r.bedrag) }} |
+        {% endfor %}| **Totaal** | | **{{ eur(states(f)) }}** |
+
+        {% set c = state_attr(f, 'categorieen') or {} %}{% for k, v in c.items() if v != 0 %}{{ namen.get(k, k) }} {{ eur(v) }}{{ ' · ' if not loop.last }}{% endfor %}
+  - type: grid
+    cards:
+    - type: heading
+      heading: Alle facturen
+      heading_style: title
+      icon: mdi:format-list-bulleted
+    - type: tile
+      entity: sensor.dots_energy_openstaand
+      name: Openstaand
+      icon: mdi:cash-clock
+      color: orange
+      grid_options:
+        columns: full
+    - type: markdown
+      grid_options:
+        columns: full
+      content: |-
+        {% set maanden = ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'] %}| Periode | Bedrag | Status |
+        |:--|--:|:--|
+        {% for f in state_attr('sensor.dots_energy_maandoverzicht', 'facturen') or [] %}{% set p = f.periode.split('-') %}| {{ maanden[p[1] | int - 1] }} {{ p[0] }} | € {{ '%.2f' | format(f.totaal) | replace('.', ',') }} | {% if f.status == 'paid' %}<ha-icon icon="mdi:check-circle"></ha-icon> Betaald{% elif f.status == 'pending' %}<ha-icon icon="mdi:timer-sand"></ha-icon> In behandeling{% else %}<ha-icon icon="mdi:alert-circle"></ha-icon> {{ f.status }}{% endif %} |
+        {% endfor %}
