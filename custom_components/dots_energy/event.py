@@ -22,7 +22,7 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the new-invoice event entity."""
-    async_add_entities([DotsNewInvoiceEvent(entry.runtime_data)])
+    async_add_entities([DotsNewInvoiceEvent(entry.runtime_data.invoices)])
 
 
 class DotsNewInvoiceEvent(DotsEntity, EventEntity):

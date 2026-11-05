@@ -171,7 +171,7 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Dots sensors."""
-    coordinator = entry.runtime_data
+    coordinator = entry.runtime_data.invoices
     async_add_entities(DotsSensor(coordinator, description) for description in SENSORS)
 
 

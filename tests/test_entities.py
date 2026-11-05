@@ -159,7 +159,7 @@ async def test_entities_stay_available_on_update_failure(hass, entry, aioclient_
     aioclient_mock.post(TOKEN, json=token_payload("AT-2", "RT-2"))
     aioclient_mock.get(f"{API}/v1/my/locations/7/invoices", status=500, text="boom")
 
-    coordinator = entry.runtime_data
+    coordinator = entry.runtime_data.invoices
     await coordinator.async_refresh()
     await hass.async_block_till_done()
 

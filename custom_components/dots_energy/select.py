@@ -17,7 +17,7 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the invoice select."""
-    async_add_entities([DotsInvoiceSelect(entry.runtime_data)])
+    async_add_entities([DotsInvoiceSelect(entry.runtime_data.invoices)])
 
 
 class DotsInvoiceSelect(DotsEntity, SelectEntity):

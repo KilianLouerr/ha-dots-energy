@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant
 
 from . import DotsConfigEntry
 from .const import CONF_LOCATION_ID, CONF_REFRESH_TOKEN
+from .forecast import forecast_diagnostics
 from .kpis import newest_first
 
 TO_REDACT = {CONF_EMAIL, CONF_PASSWORD, CONF_REFRESH_TOKEN, CONF_LOCATION_ID}
@@ -19,11 +20,12 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: DotsConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics; invoice numbers are replaced by an index."""
-    coordinator = entry.runtime_data
+    coordinator = entry.runtime_data.invoices
     data = coordinator.data
     result: dict[str, Any] = {
         "entry": async_redact_data(dict(entry.data), TO_REDACT),
         "last_update_success": coordinator.last_update_success,
+        "forecast": forecast_diagnostics(entry.runtime_data.forecast),
     }
     if data is None:
         return result
