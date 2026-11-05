@@ -1,0 +1,24 @@
+# Melding op je telefoon bij een nieuwe Dots-factuur.
+# Vervang notify.mobile_app_jouw_telefoon door de notify-actie van je eigen telefoon.
+alias: "Dots: nieuwe factuur"
+description: Stuurt een melding met het bedrag en het verschil met de vorige maand.
+mode: queued
+triggers:
+  - trigger: state
+    entity_id: event.dots_energy_nieuwe_factuur
+    not_from:
+      - unavailable
+      - unknown
+actions:
+  - variables:
+      bedrag: "{{ trigger.to_state.attributes.amount }}"
+      verschil: "{{ trigger.to_state.attributes.difference }}"
+      periode: "{{ trigger.to_state.attributes.period }}"
+  - action: notify.mobile_app_jouw_telefoon
+    data:
+      title: Nieuwe Dots-factuur
+      message: >-
+        € {{ '%.2f' | format(bedrag | float) | replace('.', ',') }} voor {{ periode }}
+        {%- if verschil is not none %}
+        ({{ '+' if verschil | float >= 0 else '−' }}€ {{ '%.2f' | format(verschil | float | abs) | replace('.', ',') }} t.o.v. vorige maand)
+        {%- endif %}
