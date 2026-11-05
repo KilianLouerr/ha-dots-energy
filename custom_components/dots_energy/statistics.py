@@ -32,7 +32,7 @@ _LABELS = {
 
 async def async_import_statistics(hass: HomeAssistant, monthly: list[dict[str, Any]]) -> None:
     """Rewrite the full monthly series per category (and the total)."""
-    if not monthly:
+    if not monthly or "recorder" not in hass.config.components:
         return
     tz = dt_util.get_default_time_zone()
     for key, label in _LABELS.items():

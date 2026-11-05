@@ -228,3 +228,14 @@ async def test_no_secrets_in_logs(aioclient_mock, make_auth, caplog) -> None:
 
     for secret in (PASSWORD, EMAIL, "AT-login", "RT-login", "CODE1"):
         assert secret not in caplog.text
+
+
+@pytest.mark.parametrize("where", ["authorize", "login_page"])
+async def test_login_server_error_raises_cannot_connect(aioclient_mock, make_auth, where) -> None:
+    if where == "authorize":
+        aioclient_mock.get(AUTHORIZE_RE, status=503)
+    else:
+        aioclient_mock.get(AUTHORIZE_RE, status=302, headers={"Location": "/u/login?state=ST1"})
+        aioclient_mock.get(LOGIN, status=502, text="bad gateway")
+    with pytest.raises(CannotConnect):
+        await make_auth().async_login()

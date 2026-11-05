@@ -20,6 +20,7 @@ MONTHLY = [
 
 async def test_statistics_rows_and_cumulative_sum(hass) -> None:
     await hass.config.async_set_time_zone("Europe/Brussels")
+    hass.config.components.add("recorder")
     with patch(
         "custom_components.dots_energy.statistics.async_add_external_statistics"
     ) as add:
@@ -46,6 +47,16 @@ async def test_statistics_rows_and_cumulative_sum(hass) -> None:
     assert [r["sum"] for r in rows] == [80.0, 115.65]
     _, total_rows = calls["dots_energy:totaal"]
     assert [r["sum"] for r in total_rows] == [80.0, 155.88]
+
+
+async def test_statistics_skipped_without_recorder(hass) -> None:
+    if "recorder" in hass.config.components:
+        hass.config.components.remove("recorder")
+    with patch(
+        "custom_components.dots_energy.statistics.async_add_external_statistics"
+    ) as add:
+        await async_import_statistics(hass, MONTHLY)
+    add.assert_not_called()
 
 
 async def test_statistics_empty_does_nothing(hass) -> None:

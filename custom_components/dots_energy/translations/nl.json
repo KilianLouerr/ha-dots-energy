@@ -1,0 +1,57 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Aanmelden bij Dots Energy",
+        "description": "Gebruik het e-mailadres en wachtwoord van het Dots-klantenportaal.",
+        "data": {
+          "email": "E-mail",
+          "password": "Wachtwoord"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Opnieuw aanmelden bij Dots Energy",
+        "description": "Dots aanvaardt de bewaarde login niet meer. Vul je wachtwoord opnieuw in.",
+        "data": {
+          "email": "E-mail",
+          "password": "Wachtwoord"
+        }
+      },
+      "captcha": {
+        "title": "Dots vraagt een captcha",
+        "description": "Dots toont een captcha op de loginpagina, dus Home Assistant kan niet automatisch aanmelden. Gebruik een refresh token, of probeer het later opnieuw.",
+        "menu_options": {
+          "refresh_token": "Refresh token gebruiken",
+          "user": "Opnieuw proberen met e-mail en wachtwoord",
+          "reauth_confirm": "Opnieuw proberen met e-mail en wachtwoord"
+        }
+      },
+      "refresh_token": {
+        "title": "Refresh token",
+        "description": "Open een privévenster, meld je aan op https://my.dotsenergy.be, open de ontwikkelaarstools (F12) → Application → Session Storage → https://my.dotsenergy.be → de sleutel die begint met oidc.user: en kopieer de waarde van refresh_token. Sluit dat venster daarna en gebruik die sessie niet meer.",
+        "data": {
+          "refresh_token": "Refresh token"
+        }
+      },
+      "location": {
+        "title": "Leveringsadres",
+        "description": "Je account heeft meerdere leveringsadressen. Kies welk je wil volgen.",
+        "data": {
+          "location_id": "Adres"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Dots aanvaardt deze login niet.",
+      "cannot_connect": "Dots is niet bereikbaar. Probeer het later opnieuw.",
+      "unknown": "Onverwacht antwoord van Dots. Probeer het later opnieuw."
+    },
+    "abort": {
+      "already_configured": "Dit Dots-account is al ingesteld.",
+      "reauth_successful": "Opnieuw aangemeld.",
+      "wrong_account": "Dit is een ander Dots-account dan het ingestelde.",
+      "cannot_connect": "Dots is niet bereikbaar. Probeer het later opnieuw.",
+      "no_locations": "Geen leveringsadres gevonden op dit Dots-account."
+    }
+  }
+}

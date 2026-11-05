@@ -1,0 +1,57 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sign in to Dots Energy",
+        "description": "Use the e-mail address and password of the Dots customer portal.",
+        "data": {
+          "email": "E-mail",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in to Dots Energy again",
+        "description": "Dots no longer accepts the stored login. Enter your password again.",
+        "data": {
+          "email": "E-mail",
+          "password": "Password"
+        }
+      },
+      "captcha": {
+        "title": "Dots asks for a captcha",
+        "description": "Dots shows a captcha on its login page, so Home Assistant cannot sign in automatically. Use a refresh token instead, or try again later.",
+        "menu_options": {
+          "refresh_token": "Use a refresh token",
+          "user": "Try e-mail and password again",
+          "reauth_confirm": "Try e-mail and password again"
+        }
+      },
+      "refresh_token": {
+        "title": "Refresh token",
+        "description": "Open a private browser window, sign in at https://my.dotsenergy.be, open the developer tools (F12) → Application → Session Storage → https://my.dotsenergy.be → the key starting with oidc.user: and copy the value of refresh_token. Close that window afterwards and do not use that session again.",
+        "data": {
+          "refresh_token": "Refresh token"
+        }
+      },
+      "location": {
+        "title": "Delivery address",
+        "description": "Your account has several delivery addresses. Pick the one to follow.",
+        "data": {
+          "location_id": "Address"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Dots did not accept this login.",
+      "cannot_connect": "Dots could not be reached. Try again later.",
+      "unknown": "Unexpected answer from Dots. Try again later."
+    },
+    "abort": {
+      "already_configured": "This Dots account is already set up.",
+      "reauth_successful": "Signed in again.",
+      "wrong_account": "This is a different Dots account than the one set up.",
+      "cannot_connect": "Dots could not be reached. Try again later.",
+      "no_locations": "No delivery address found on this Dots account."
+    }
+  }
+}

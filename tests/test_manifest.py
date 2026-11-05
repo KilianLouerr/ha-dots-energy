@@ -16,7 +16,8 @@ def test_manifest_and_hacs_consistent() -> None:
 
     assert manifest["domain"] == DOMAIN == "dots_energy"
     assert manifest["config_flow"] is True
-    assert "recorder" in manifest["dependencies"]
+    assert manifest["after_dependencies"] == ["recorder"]
+    assert "dependencies" not in manifest
     assert hacs["homeassistant"] == "2026.10.0"
     assert [c.value for c in Category] == [
         "energie",

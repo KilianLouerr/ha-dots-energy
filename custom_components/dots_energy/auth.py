@@ -213,6 +213,8 @@ class DotsAuth:
             async with self._login_session_factory() as login_session:
                 login_url = await self._async_follow(login_session, authorize_url, stop_at_login=True)
                 async with login_session.get(login_url, allow_redirects=False) as resp:
+                    if resp.status >= 500:
+                        raise CannotConnect(f"Login page returned HTTP {resp.status}")
                     if resp.status != 200:
                         raise AuthError(f"Login page returned HTTP {resp.status}")
                     html = await resp.text()
@@ -232,6 +234,8 @@ class DotsAuth:
                     status = resp.status
                     location = resp.headers.get("Location")
                     body = await resp.text() if status != 302 else ""
+                if status >= 500:
+                    raise CannotConnect(f"Login returned HTTP {status}")
                 if status in (400, 401):
                     if captcha_required(body):
                         raise CaptchaRequired("Login requires a captcha")
@@ -274,6 +278,8 @@ class DotsAuth:
             async with session.get(current, allow_redirects=False) as resp:
                 status = resp.status
                 location = resp.headers.get("Location")
+            if status >= 500:
+                raise CannotConnect(f"Auth0 returned HTTP {status} during login")
             if status not in (301, 302, 303, 307, 308) or not location:
                 raise AuthError(f"Unexpected HTTP {status} during login redirects")
             nxt = str(URL(current).join(URL(location)))

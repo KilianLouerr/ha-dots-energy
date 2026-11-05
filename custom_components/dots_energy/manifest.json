@@ -1,9 +1,13 @@
 {
   "domain": "dots_energy",
   "name": "Dots Energy",
-  "codeowners": ["@KilianLouerr"],
+  "after_dependencies": [
+    "recorder"
+  ],
+  "codeowners": [
+    "@KilianLouerr"
+  ],
   "config_flow": true,
-  "dependencies": ["recorder"],
   "documentation": "https://github.com/KilianLouerr/ha-dots-energy",
   "integration_type": "service",
   "iot_class": "cloud_polling",
