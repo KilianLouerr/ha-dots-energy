@@ -20,8 +20,10 @@ from . import DotsConfigEntry
 from .categories import Breakdown, categorize_line
 from .coordinator import DotsData
 from .entity import DotsEntity
+from .forecast import DotsForecastCoordinator, ForecastData
 from .kpis import invoice_label, newest_first
 from .models import InvoiceSummary
+from .tariff import Bill
 
 EUR = "EUR"
 
@@ -173,6 +175,10 @@ async def async_setup_entry(
     """Set up Dots sensors."""
     coordinator = entry.runtime_data.invoices
     async_add_entities(DotsSensor(coordinator, description) for description in SENSORS)
+    forecast = entry.runtime_data.forecast
+    async_add_entities(
+        DotsForecastSensor(forecast, description) for description in FORECAST_SENSORS
+    )
 
 
 class DotsSensor(DotsEntity, SensorEntity):
@@ -198,3 +204,119 @@ class DotsSensor(DotsEntity, SensorEntity):
         return self.entity_description.attrs_fn(
             self.coordinator.data, self.coordinator.selected_invoice_id
         )
+
+
+def _money(value: Decimal) -> float:
+    return round(float(value), 2)
+
+
+def _bill_categories(bill: Bill) -> dict[str, float]:
+    return {c.value: _money(a) for c, a in bill.by_category().items()}
+
+
+def _round_opt(value: Decimal | None, digits: int) -> float | None:
+    return None if value is None else round(float(value), digits)
+
+
+def _common(data: ForecastData, bill: Bill) -> dict[str, Any]:
+    return {
+        "maand": data.month,
+        "categorieen": _bill_categories(bill),
+        "kwaliteit": data.quality,
+        "ontbreekt": sorted(data.forecast.missing),
+        "berekend_op": data.computed_at.isoformat(),
+    }
+
+
+def _series(series: tuple[tuple[int, Decimal], ...]) -> list[dict[str, Any]]:
+    return [{"dag": day, "totaal": _money(total)} for day, total in series]
+
+
+def _expected_attrs(data: ForecastData) -> dict[str, Any]:
+    bill = data.forecast.expected
+    return _common(data, bill) | {
+        "regels": [
+            {
+                "omschrijving": line.description,
+                "categorie": line.category.value,
+                "hoeveelheid": _round_opt(line.quantity, 3),
+                "eenheidsprijs": _round_opt(line.unit_price, 4),
+                "bedrag": _money(line.amount),
+            }
+            for line in bill.lines
+        ],
+        "vorige_factuur": (
+            _money(data.previous_invoice_total) if data.previous_invoice_total is not None else None
+        ),
+    }
+
+
+def _so_far_attrs(data: ForecastData) -> dict[str, Any]:
+    f = data.forecast
+    return _common(data, f.so_far) | {
+        "dag": f.day,
+        "dagen_in_maand": f.days_in_month,
+        "dagreeks": _series(f.daily),
+        "vorige_maand": data.previous_month,
+        "dagreeks_vorige_maand": _series(data.previous_daily),
+    }
+
+
+@dataclass(frozen=True, kw_only=True)
+class DotsForecastSensorDescription(SensorEntityDescription):
+    """Describes a forecast sensor."""
+
+    value_fn: Callable[[ForecastData], float]
+    attrs_fn: Callable[[ForecastData], dict[str, Any]]
+
+
+FORECAST_SENSORS: tuple[DotsForecastSensorDescription, ...] = (
+    DotsForecastSensorDescription(
+        key="verwachte_factuur",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement=EUR,
+        suggested_display_precision=2,
+        value_fn=lambda d: _money(d.forecast.expected.total),
+        attrs_fn=_expected_attrs,
+    ),
+    DotsForecastSensorDescription(
+        key="factuur_tot_nu_toe",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement=EUR,
+        suggested_display_precision=2,
+        value_fn=lambda d: _money(d.forecast.so_far.total),
+        attrs_fn=_so_far_attrs,
+    ),
+)
+
+
+class DotsForecastSensor(DotsEntity, SensorEntity):
+    """Forecast of the running month's invoice."""
+
+    entity_description: DotsForecastSensorDescription
+    _unrecorded_attributes = frozenset(
+        {"regels", "categorieen", "dagreeks", "dagreeks_vorige_maand"}
+    )
+
+    def __init__(
+        self, coordinator: DotsForecastCoordinator, description: DotsForecastSensorDescription
+    ) -> None:
+        super().__init__(coordinator, "sensor", description.key)  # type: ignore[arg-type]
+        self.entity_description = description
+
+    @property
+    def available(self) -> bool:
+        """Available while the last forecast succeeded and produced a result."""
+        return self.coordinator.last_update_success and self.coordinator.data is not None
+
+    @property
+    def native_value(self) -> float | None:
+        """Total of the bill."""
+        data = self.coordinator.data
+        return self.entity_description.value_fn(data) if data else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Breakdown and series."""
+        data = self.coordinator.data
+        return self.entity_description.attrs_fn(data) if data else {}

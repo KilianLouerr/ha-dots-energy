@@ -219,3 +219,11 @@ async def test_invoice_detected_during_setup_reaches_event_entity(
     state = hass.states.get("event.dots_energy_nieuwe_factuur")
     assert state.attributes.get("event_type") == "nieuwe_factuur"
     assert state.attributes["invoice_number"] == "TST00000103"
+
+
+async def test_forecast_sensors_unavailable_without_sources(hass, entry) -> None:
+    for entity_id in (
+        "sensor.dots_energy_verwachte_factuur",
+        "sensor.dots_energy_factuur_tot_nu_toe",
+    ):
+        assert hass.states.get(entity_id).state == STATE_UNAVAILABLE

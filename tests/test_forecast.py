@@ -189,3 +189,33 @@ async def test_diagnostics_contains_forecast_without_entity_ids(
     assert diagnostics["forecast"]["month"] == "2026-03"
     assert IMPORT not in dumped
     assert PRICE not in dumped
+
+
+async def test_forecast_sensors_state_and_attributes(hass, aioclient_mock, freezer) -> None:
+    await _setup(hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT})
+    expected = hass.states.get("sensor.dots_energy_verwachte_factuur")
+    so_far = hass.states.get("sensor.dots_energy_factuur_tot_nu_toe")
+    assert expected.attributes["unit_of_measurement"] == "EUR"
+    assert expected.attributes["maand"] == "2026-03"
+    assert round(sum(expected.attributes["categorieen"].values()), 2) == float(expected.state)
+    assert round(sum(r["bedrag"] for r in expected.attributes["regels"]), 2) == float(
+        expected.state
+    )
+    assert expected.attributes["vorige_factuur"] == 88.38
+    assert so_far.attributes["dag"] == 20
+    assert so_far.attributes["dagen_in_maand"] == 31
+    assert so_far.attributes["dagreeks"][-1] == {"dag": 20, "totaal": float(so_far.state)}
+    assert so_far.attributes["vorige_maand"] == "2026-02"
+    assert len(so_far.attributes["dagreeks_vorige_maand"]) == 28
+    assert round(sum(so_far.attributes["categorieen"].values()), 2) == float(so_far.state)
+
+
+async def test_forecast_sensors_ruw_flag(hass, aioclient_mock, freezer) -> None:
+    await _setup(hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT})
+    for entity_id in (
+        "sensor.dots_energy_verwachte_factuur",
+        "sensor.dots_energy_factuur_tot_nu_toe",
+    ):
+        state = hass.states.get(entity_id)
+        assert state.attributes["kwaliteit"] == "ruw"
+        assert "marktprijs" in state.attributes["ontbreekt"]

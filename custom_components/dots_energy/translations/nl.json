@@ -88,6 +88,12 @@
       },
       "laatst_bijgewerkt": {
         "name": "Laatst bijgewerkt"
+      },
+      "verwachte_factuur": {
+        "name": "Verwachte factuur"
+      },
+      "factuur_tot_nu_toe": {
+        "name": "Factuur tot nu toe"
       }
     },
     "select": {
