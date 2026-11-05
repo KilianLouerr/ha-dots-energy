@@ -136,3 +136,33 @@ async def test_connection_error_raises_api_error(aioclient_mock, client) -> None
     aioclient_mock.get(f"{API}/v1/my/invoices/102", exc=aiohttp.ClientConnectionError())
     with pytest.raises(ApiError):
         await client.async_get_invoice(102)
+
+
+async def test_non_json_response_raises_api_error(aioclient_mock, client) -> None:
+    aioclient_mock.post(TOKEN, json=token_payload("AT-1", "RT-1"))
+    aioclient_mock.get(
+        f"{API}/v1/my/locations/7/invoices",
+        text="<html>Onderhoud</html>",
+        headers={"Content-Type": "text/html"},
+    )
+    with pytest.raises(ApiError):
+        await client.async_get_invoices(7)
+
+
+async def test_malformed_detail_raises_api_error(aioclient_mock, client) -> None:
+    detail = load_fixture("invoice_detail.json")
+    detail["periodStart"] = None
+    detail["charges"][0]["amount"] = None
+    aioclient_mock.post(TOKEN, json=token_payload("AT-1", "RT-1"))
+    aioclient_mock.get(f"{API}/v1/my/invoices/102", json=detail)
+    with pytest.raises(ApiError):
+        await client.async_get_invoice(102)
+
+
+async def test_unexpected_contract_shape_raises_api_error(aioclient_mock, client) -> None:
+    aioclient_mock.post(TOKEN, json=token_payload("AT-1", "RT-1"))
+    aioclient_mock.get(
+        f"{API}/v1/my/locations/7/contracts/active?energyType=electricity", json=[]
+    )
+    with pytest.raises(ApiError):
+        await client.async_get_active_contract(7)

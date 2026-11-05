@@ -69,3 +69,16 @@ def test_detail_roundtrip() -> None:
     detail = parse_invoice_detail(load_fixture("invoice_detail.json"))
 
     assert detail_from_dict(json.loads(json.dumps(detail_to_dict(detail)))) == detail
+
+
+def test_parse_list_skips_malformed_items(caplog) -> None:
+    data = load_fixture("invoice_list.json")
+    data[1]["periodStart"] = None
+    data[2]["totalAmount"] = "not-a-number"
+
+    invoices = parse_invoice_list(data)
+
+    assert [i.id for i in invoices] == [101]
+    assert "index 1" in caplog.text
+    assert "index 2" in caplog.text
+    assert "TST0000" not in caplog.text

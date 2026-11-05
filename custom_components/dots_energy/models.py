@@ -6,10 +6,15 @@ so they cannot end up in storage, attributes, logs or diagnostics.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
+
+_LOGGER = logging.getLogger(__name__)
+
+PARSE_ERRORS = (KeyError, TypeError, ValueError, AttributeError, InvalidOperation)
 
 LineKind = Literal["charge", "discount", "tax"]
 
@@ -84,8 +89,18 @@ def _parse_summary(data: dict[str, Any]) -> InvoiceSummary:
 
 
 def parse_invoice_list(data: list[dict[str, Any]]) -> list[InvoiceSummary]:
-    """Parse the invoice list endpoint."""
-    return [_parse_summary(item) for item in data]
+    """Parse the invoice list endpoint; malformed items are skipped and logged."""
+    invoices: list[InvoiceSummary] = []
+    for index, item in enumerate(data):
+        try:
+            invoices.append(_parse_summary(item))
+        except PARSE_ERRORS as err:
+            _LOGGER.warning(
+                "Dots-factuur op index %s overgeslagen: onverwacht formaat (%s)",
+                index,
+                type(err).__name__,
+            )
+    return invoices
 
 
 def parse_invoice_detail(data: dict[str, Any]) -> InvoiceDetail:
