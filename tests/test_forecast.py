@@ -165,6 +165,27 @@ async def test_month_rollover_starts_new_series(hass, aioclient_mock, freezer) -
     assert "2026-04" in coordinator.stored["snapshots"]
 
 
+async def test_closed_months_keep_their_last_forecast(hass, aioclient_mock, freezer) -> None:
+    entry = await _setup(
+        hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT}, now="2026-03-31 23:40:00+02:00"
+    )
+    coordinator = entry.runtime_data.forecast
+    march = coordinator.stored["snapshots"]["2026-03"]["laatste"]
+    expected = hass.states.get("sensor.dots_energy_verwachte_factuur")
+    assert expected.attributes["voorspellingen"] == []
+    freezer.move_to("2026-04-01 00:10:00+02:00")
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    expected = hass.states.get("sensor.dots_energy_verwachte_factuur")
+    past = expected.attributes["voorspellingen"]
+    assert [p["maand"] for p in past] == ["2026-03"]
+    assert past[0]["totaal"] == round(float(march["totaal"]), 2)
+    assert past[0]["categorieen"] == {
+        k: round(float(v), 2) for k, v in march["categorieen"].items()
+    }
+    assert past[0]["berekend_op"] == march["berekend_op"]
+
+
 async def test_refits_when_invoices_update(hass, aioclient_mock, freezer) -> None:
     entry = await _setup(hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT})
     runtime = entry.runtime_data

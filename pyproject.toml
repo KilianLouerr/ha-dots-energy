@@ -1,6 +1,6 @@
 [project]
 name = "ha-dots-energy"
-version = "0.3.0"
+version = "0.4.0"
 description = "Home Assistant integration for Dots Energy invoices"
 requires-python = ">=3.14.2,<3.15"
 

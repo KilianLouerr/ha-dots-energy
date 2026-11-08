@@ -66,6 +66,16 @@ VALUE_PRECISION = Decimal("0.000001")
 Series = tuple[tuple[int, Decimal], ...]
 
 
+@dataclass(frozen=True)
+class PastForecast:
+    """The last forecast made for a month that has ended."""
+
+    month: str
+    total: Decimal
+    categories: dict[str, Decimal]
+    computed_at: str | None
+
+
 @dataclass
 class ForecastData:
     """What the forecast sensors show."""
@@ -77,6 +87,7 @@ class ForecastData:
     previous_invoice_total: Decimal | None
     quality: Literal["volledig", "ruw"]
     computed_at: datetime
+    past_forecasts: tuple[PastForecast, ...] = ()
 
 
 def month_key(moment: datetime | date) -> str:
@@ -135,6 +146,24 @@ def _decode_prices(stored: Mapping[str, Any]) -> dict[datetime, Decimal]:
 def spread_prices(hourly: Mapping[datetime, Decimal]) -> dict[datetime, Decimal]:
     """An hourly price applies to each of its four quarters."""
     return {hour + SLOT * index: price for hour, price in hourly.items() for index in range(4)}
+
+
+def past_forecasts(snapshots: Mapping[str, Any], current: str) -> tuple[PastForecast, ...]:
+    """The last stored forecast of every month before `current`, newest first."""
+    result = []
+    for month in sorted((m for m in snapshots if m < current), reverse=True):
+        last = snapshots[month].get("laatste")
+        if not last:
+            continue
+        result.append(
+            PastForecast(
+                month=month,
+                total=Decimal(last["totaal"]),
+                categories={k: Decimal(v) for k, v in last.get("categorieen", {}).items()},
+                computed_at=last.get("berekend_op"),
+            )
+        )
+    return tuple(result)
 
 
 def _usage_to_dict(m: MonthMeasured) -> dict[str, Any]:
@@ -346,6 +375,7 @@ class DotsForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
             previous_invoice_total=last.total if last else None,
             quality="ruw" if result.missing else "volledig",
             computed_at=dt_util.utcnow(),
+            past_forecasts=past_forecasts(stored["snapshots"], month_key(month_start)),
         )
 
     def _check_sources(self, options: Mapping[str, Any]) -> None:

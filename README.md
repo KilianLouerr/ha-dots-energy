@@ -94,6 +94,11 @@ historiek). Sensoren met een attribuut `raw_today`/`raw_tomorrow` (zoals de Nord
 leveren de kwartierprijzen rechtstreeks. De opslag op de marktprijs kan dus pas geleerd worden na een volledige
 factuurmaand met vastgelegde prijzen.
 
+De laatste voorspelling van elke afgelopen maand blijft 13 maanden bewaard. Het attribuut
+`voorspellingen` van `sensor.dots_energy_verwachte_factuur` geeft ze per maand (`maand`,
+`totaal`, `categorieen`, `berekend_op`), nieuwste eerst, zodat je ze naast de echte factuur kunt
+leggen zodra die binnen is.
+
 Ontbreekt er iets (prijs, meting, gegevens van de batterijsturing), dan blijft de voorspelling
 een getal tonen en staat het attribuut `kwaliteit` op `ruw`, met in `ontbreekt` wat er
 ontbrak.

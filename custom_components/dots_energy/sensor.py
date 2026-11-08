@@ -248,6 +248,15 @@ def _expected_attrs(data: ForecastData) -> dict[str, Any]:
         "vorige_factuur": (
             _money(data.previous_invoice_total) if data.previous_invoice_total is not None else None
         ),
+        "voorspellingen": [
+            {
+                "maand": p.month,
+                "totaal": _money(p.total),
+                "categorieen": {k: _money(v) for k, v in p.categories.items()},
+                "berekend_op": p.computed_at,
+            }
+            for p in data.past_forecasts
+        ],
     }
 
 
@@ -295,7 +304,7 @@ class DotsForecastSensor(DotsEntity, SensorEntity):
 
     entity_description: DotsForecastSensorDescription
     _unrecorded_attributes = frozenset(
-        {"regels", "categorieen", "dagreeks", "dagreeks_vorige_maand"}
+        {"regels", "categorieen", "dagreeks", "dagreeks_vorige_maand", "voorspellingen"}
     )
 
     def __init__(
