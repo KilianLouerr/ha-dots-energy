@@ -94,6 +94,10 @@ historiek). Sensoren met een attribuut `raw_today`/`raw_tomorrow` (zoals de Nord
 leveren de kwartierprijzen rechtstreeks. De opslag op de marktprijs kan dus pas geleerd worden na een volledige
 factuurmaand met vastgelegde prijzen.
 
+Een factuurmaand telt mee voor het leren als je gemeten kWh binnen 3% van de factuur liggen en
+hooguit 2% van de kwartieren ontbrak (bv. een herstart van Home Assistant); ontbrekende
+kwartieren worden ingevuld met het gemiddelde van hetzelfde tijdstip.
+
 De laatste voorspelling van elke afgelopen maand blijft 13 maanden bewaard. Het attribuut
 `voorspellingen` van `sensor.dots_energy_verwachte_factuur` geeft ze per maand (`maand`,
 `totaal`, `categorieen`, `berekend_op`), nieuwste eerst, zodat je ze naast de echte factuur kunt

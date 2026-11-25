@@ -44,10 +44,18 @@ def measured(
     )
 
 
-def test_month_with_invalid_hour_not_eligible():
+def test_month_with_a_few_filled_quarters_is_eligible():
+    """A missed hour (four quarters) must not cost a whole month of fitting."""
     d = detail(period="2026-01", kwh_in=200)
     assert eligible(measured("2026-01"), d)
-    assert not eligible(measured("2026-01", invalid=1), d)
+    assert eligible(measured("2026-01", invalid=4), d)
+
+
+def test_month_with_more_than_2_percent_filled_not_eligible():
+    d = detail(period="2026-01", kwh_in=200)
+    # 31 days x 96 quarters = 2976; 2% = 59.52
+    assert eligible(measured("2026-01", invalid=59), d)
+    assert not eligible(measured("2026-01", invalid=60), d)
 
 
 def test_month_more_than_3_percent_off_not_eligible():
@@ -82,7 +90,7 @@ def test_markup_needs_80_percent_priced():
 
 def test_ineligible_month_not_used():
     jan = detail(period="2026-01", energy_price=0.15)
-    m = {"2026-01": measured("2026-01", priced_in=(D(200), D(24)), invalid=2)}
+    m = {"2026-01": measured("2026-01", priced_in=(D(200), D(24)), invalid=200)}
     assert fit_params([jan], breakdowns(jan), m).energy_markup is None
 
 
@@ -137,7 +145,7 @@ def test_gap_in_injection_only_blocks_injection_markup():
     jan = detail(period="2026-01", energy_price=0.15, injection_price=0.10)
     m = {
         "2026-01": measured(
-            "2026-01", priced_in=(D(200), D(24)), priced_out=(D(50), D(4)), invalid_out=3
+            "2026-01", priced_in=(D(200), D(24)), priced_out=(D(50), D(4)), invalid_out=200
         )
     }
     params = fit_params([jan], breakdowns(jan), m)
@@ -147,7 +155,28 @@ def test_gap_in_injection_only_blocks_injection_markup():
 
 def test_gap_in_steered_only_blocks_flex():
     jan = detail(period="2026-01", energy_price=0.15, flex=6.0)
-    m = {"2026-01": measured("2026-01", priced_in=(D(200), D(24)), steered=150, invalid_steered=1)}
+    m = {
+        "2026-01": measured("2026-01", priced_in=(D(200), D(24)), steered=150, invalid_steered=200)
+    }
     params = fit_params([jan], breakdowns(jan), m)
     assert params.energy_markup == D("0.03")
     assert params.flex_per_kwh is None
+
+
+def test_small_gaps_in_injection_and_steered_still_fit():
+    jan = detail(period="2026-01", energy_price=0.15, injection_price=0.10, flex=6.0)
+    m = {
+        "2026-01": measured(
+            "2026-01",
+            priced_in=(D(200), D(24)),
+            priced_out=(D(50), D(4)),
+            steered=150,
+            invalid=4,
+            invalid_out=4,
+            invalid_steered=8,
+        )
+    }
+    params = fit_params([jan], breakdowns(jan), m)
+    assert params.energy_markup == D("0.03")
+    assert params.injection_markup == D("0.02")
+    assert params.flex_per_kwh == D("0.04")

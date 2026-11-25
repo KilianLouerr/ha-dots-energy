@@ -10,9 +10,13 @@ from .categories import Breakdown, breakdown
 from .const import Category
 from .kpis import afname_kwh, is_credit_note
 from .models import InvoiceDetail
+from .projection import SLOTS_PER_DAY
 from .tariff import FitParams, MonthUsage, injection_kwh
 
 MAX_KWH_DEVIATION = Decimal("0.03")
+# Quarters filled in (missing or implausible) that a month may have and still be fitted on:
+# a missed hour or a restart should not cost a whole month. The kWh check stays the guard.
+MAX_FILLED_SHARE = Decimal("0.02")
 MIN_PRICED_SHARE = Decimal("0.8")
 MIN_TRANSPORT_MONTHS = 3
 PRECISION = Decimal("0.000001")
@@ -25,14 +29,19 @@ class MonthMeasured:
 
     month: str
     usage: MonthUsage
-    invalid_hours: int  # import (afname) hours missing or discarded
-    invalid_out: int = 0  # injection hours missing or discarded
-    invalid_steered: int = 0  # steered-kWh hours missing or discarded
+    invalid_hours: int  # import (afname) quarters filled in (name kept for the Store)
+    invalid_out: int = 0  # injection quarters filled in
+    invalid_steered: int = 0  # steered-kWh quarters filled in
+
+
+def few_gaps(invalid: int, usage: MonthUsage) -> bool:
+    """Whether at most MAX_FILLED_SHARE of the month's quarters were filled in."""
+    return invalid <= usage.days_in_month * SLOTS_PER_DAY * MAX_FILLED_SHARE
 
 
 def eligible(measured: MonthMeasured, detail: InvoiceDetail) -> bool:
-    """Whether a measured month is complete and matches its invoice closely enough."""
-    if measured.invalid_hours:
+    """Whether a measured month is (nearly) complete and matches its invoice closely enough."""
+    if not few_gaps(measured.invalid_hours, measured.usage):
         return False
     billed = afname_kwh(detail)
     if not billed:
@@ -104,7 +113,12 @@ def fit_params(
             energy.append(markup)
         settlement = _line(detail, "settlement injectie", kind="discount")
         injected = injection_kwh(detail)
-        if settlement is not None and injected and usage.kwh_out is not None and not m.invalid_out:
+        if (
+            settlement is not None
+            and injected
+            and usage.kwh_out is not None
+            and few_gaps(m.invalid_out, usage)
+        ):
             markup = _markup(abs(settlement.amount) / injected, usage.kwh_out, usage.priced_out)
             if markup is not None:
                 injection.append(markup)
@@ -112,7 +126,11 @@ def fit_params(
         billed = afname_kwh(detail)
         if transport_line is not None and usage.capacity_kw is not None and billed:
             transport.append((usage.capacity_kw, billed, transport_line.amount))
-        if usage.steered_kwh is not None and usage.steered_kwh > 0 and not m.invalid_steered:
+        if (
+            usage.steered_kwh is not None
+            and usage.steered_kwh > 0
+            and few_gaps(m.invalid_steered, usage)
+        ):
             b = breakdowns.get(detail.summary.id) or breakdown(detail)
             flex_amount += -b.amounts[Category.VERGOEDINGEN]
             flex_kwh += usage.steered_kwh
