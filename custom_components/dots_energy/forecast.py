@@ -50,7 +50,15 @@ from .sources import (
     raw_prices,
     slot_floor,
 )
-from .tariff import Bill, FitParams, MonthUsage, TariffRules, derive_rules
+from .tariff import (
+    Bill,
+    FitParams,
+    MonthUsage,
+    TariffRules,
+    UnitPrices,
+    derive_rules,
+    unit_prices,
+)
 
 if TYPE_CHECKING:
     from .coordinator import DotsCoordinator, DotsData
@@ -251,6 +259,8 @@ class DotsForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
         self._prices: dict[datetime, Decimal] = {}
         self._quarters: dict[str, dict[datetime, Decimal]] = {}
         self._seen_invoices: datetime | None = None
+        self.rules: TariffRules | None = None
+        self.params: FitParams | None = None
 
     @property
     def stored(self) -> dict[str, Any]:
@@ -260,6 +270,19 @@ class DotsForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
     def price_at(self, slot: datetime) -> Decimal | None:
         """Stored market price (without VAT) of a quarter hour."""
         return self._prices.get(slot.astimezone(UTC))
+
+    def unit_prices_now(self) -> UnitPrices | None:
+        """Import and export price of one kWh now; None without rules or market price."""
+        options = self.config_entry.options
+        price_id = options.get(OPT_PRIJS)
+        if not price_id or self.rules is None:
+            return None
+        incl_vat = bool(options.get(OPT_PRIJS_INCL_BTW, False))
+        prices = current_price(self.hass, price_id, incl_vat, self.rules.vat_rate)
+        market = prices.get(slot_floor(dt_util.utcnow()))
+        if market is None:
+            return None
+        return unit_prices(self.rules, self.params or FitParams(), market)
 
     def quarter_at(self, entity_id: str, slot: datetime) -> Decimal | None:
         """Stored quarter-hour kWh of a source entity."""
@@ -341,6 +364,7 @@ class DotsForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
         rules = derive_rules(details, data.breakdowns)
         if rules is None:
             return None
+        self.rules = rules
         stored = await self._async_load()
         now = dt_util.now()
         month_start = month_start_of(now)
@@ -357,6 +381,7 @@ class DotsForecastCoordinator(DataUpdateCoordinator[ForecastData | None]):
             prev_measured = await run(_measured, prev_ctx)
             stored["measured"][prev_measured.month] = _usage_to_dict(prev_measured)
             params = await self._async_fit(options, details, data, month_start, prev_measured)
+            self.params = params
             previous = _daily_average(prev_measured, bool(prev_ctx.afname.values))
             ctx = await self._async_context(options, month_start, now, previous)
             result = await run(forecast, ctx, rules, params)

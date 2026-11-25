@@ -49,10 +49,26 @@ en twee gebruikers van hetzelfde token kunnen elkaar afmelden.
 | `sensor.dots_energy_laatst_bijgewerkt` | tijdstip van de laatste geslaagde synchronisatie |
 | `sensor.dots_energy_factuur_tot_nu_toe` | wat de factuur van deze maand nu al zou zijn, per categorie en per dag (zie Voorspelling) |
 | `sensor.dots_energy_verwachte_factuur` | verwachte factuur voor de hele maand, per categorie en per regel (zie Voorspelling) |
+| `sensor.dots_energy_afnameprijs_nu` | wat een kWh van het net nu kost, incl. btw (zie Prijs nu; alleen met een prijssensor) |
+| `sensor.dots_energy_injectieprijs_nu` | wat een kWh injectie nu opbrengt (zie Prijs nu; alleen met een prijssensor) |
 | `select.dots_energy_factuur` | keuzelijst van alle facturen |
 | `event.dots_energy_nieuwe_factuur` | gebeurtenis bij een nieuwe factuur |
 
 De maandbedragen worden ook als externe statistieken `dots_energy:<categorie>` bewaard.
+
+## Prijs nu
+
+Met een prijssensor ingesteld (zie hieronder) geeft de integratie twee sensoren in EUR/kWh, bruikbaar
+als prijs in het energiedashboard:
+
+- **Afnameprijs nu** = (marktprijs van dit kwartier + geleerde opslag + alle toeslagen per kWh van je
+  laatste factuur: accijnzen, certificaten, evenwichtsbijdrage) × (1 + btw).
+- **Injectieprijs nu** = marktprijs + geleerde opslag − evenwichtsbijdrage injectie (geen btw).
+
+De toeslagen volgen vanzelf je laatste factuur. De opslag op de marktprijs wordt geleerd zoals voor de
+voorspelling; tot dan staan beide sensoren op "onbekend" (attribuut `opslag_geleerd`). Het deel
+distributie per kWh zit er niet in: dat staat op de factuur in één maandbedrag met het
+capaciteitstarief. De sensoren verspringen elk kwartier en bij elke wijziging van de prijssensor.
 
 ## Voorspelling
 

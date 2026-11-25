@@ -94,6 +94,12 @@
       },
       "factuur_tot_nu_toe": {
         "name": "Invoice so far"
+      },
+      "afnameprijs_nu": {
+        "name": "Import price now"
+      },
+      "injectieprijs_nu": {
+        "name": "Export price now"
       }
     },
     "select": {

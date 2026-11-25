@@ -10,6 +10,7 @@ from custom_components.dots_energy.tariff import (
     MonthUsage,
     derive_rules,
     price_month,
+    unit_prices,
 )
 
 from .forecast_data import breakdowns, detail
@@ -198,3 +199,32 @@ def test_injection_without_source_falls_back_per_day():
     assert _line(bill, "Settlement injectie totale uren").amount == D("-2.00")
     assert _line(bill, "Evenwichtsbijdrage injectie").amount == D("0.10")
     assert "injectie" in bill.missing
+
+
+def test_unit_prices_add_learned_markup_surcharges_and_vat():
+    rules, _ = _rules()
+    params = FitParams(energy_markup=D("0.02"), injection_markup=D("-0.02"))
+    prices = unit_prices(rules, params, D("0.10"))
+    # kWh lines of the test invoice: special excise 0.05, excise 0, balancing 0.005,
+    # green certificates 11/MWh, CHP certificates 4.6/MWh
+    assert prices.surcharges_in == D("0.0706")
+    assert prices.afname == (D("0.10") + D("0.02") + D("0.0706")) * D("1.06")
+    # injection: market + markup - balancing contribution on injection, no VAT
+    assert prices.surcharges_out == D("0.005")
+    assert prices.injectie == D("0.075")
+
+
+def test_unit_prices_unknown_until_markup_learned():
+    rules, _ = _rules()
+    prices = unit_prices(rules, FitParams(), D("0.10"))
+    assert prices.afname is None
+    assert prices.injectie is None
+    assert prices.surcharges_in == D("0.0706")
+
+
+def test_unit_prices_follow_negative_market_price():
+    rules, _ = _rules()
+    params = FitParams(energy_markup=D("0.02"), injection_markup=D("-0.02"))
+    prices = unit_prices(rules, params, D("-0.05"))
+    assert prices.injectie == D("-0.075")
+    assert prices.afname == (D("-0.05") + D("0.02") + D("0.0706")) * D("1.06")

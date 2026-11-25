@@ -94,6 +94,12 @@
       },
       "factuur_tot_nu_toe": {
         "name": "Factuur tot nu toe"
+      },
+      "afnameprijs_nu": {
+        "name": "Afnameprijs nu"
+      },
+      "injectieprijs_nu": {
+        "name": "Injectieprijs nu"
       }
     },
     "select": {

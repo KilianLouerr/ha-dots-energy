@@ -32,6 +32,7 @@ from custom_components.dots_energy.const import (
     OPT_PRIJS_INCL_BTW,
 )
 from custom_components.dots_energy.diagnostics import async_get_config_entry_diagnostics
+from custom_components.dots_energy.tariff import FitParams, unit_prices
 
 from .test_entities import EMAIL, PASSWORD, _mock_api
 
@@ -395,3 +396,84 @@ async def test_legacy_hourly_prices_are_fetched_again_per_quarter(
     coordinator = entry.runtime_data.forecast
     assert coordinator.price_at(earlier) == Decimal("0.4")
     assert coordinator.price_at(earlier + timedelta(minutes=30)) == Decimal("0.2")
+
+
+PRICE_SENSORS = ("sensor.dots_energy_afnameprijs_nu", "sensor.dots_energy_injectieprijs_nu")
+LEARNED = FitParams(energy_markup=Decimal("0.02"), injection_markup=Decimal("-0.02"))
+
+
+async def test_unit_price_sensors_only_with_a_price_entity(hass, aioclient_mock, freezer) -> None:
+    await _setup(hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT})
+    for entity_id in PRICE_SENSORS:
+        assert hass.states.get(entity_id) is None
+
+
+async def test_unit_price_sensors_unknown_until_markup_learned(
+    hass, aioclient_mock, freezer
+) -> None:
+    hass.states.async_set(PRICE, "0.10")
+    await _setup(hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT, OPT_PRIJS: PRICE})
+    afname = hass.states.get("sensor.dots_energy_afnameprijs_nu")
+    assert afname.state == "unknown"
+    assert afname.attributes["opslag_geleerd"] is False
+    assert afname.attributes["marktprijs"] == 0.1
+    assert afname.attributes["unit_of_measurement"] == "EUR/kWh"
+    assert afname.attributes["state_class"] == "measurement"
+
+
+async def test_unit_price_sensors_with_learned_markup(hass, aioclient_mock, freezer) -> None:
+    hass.states.async_set(PRICE, "0.10")
+    with patch("custom_components.dots_energy.forecast.fit_params", return_value=LEARNED):
+        entry = await _setup(hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT, OPT_PRIJS: PRICE})
+    expected = unit_prices(entry.runtime_data.forecast.rules, LEARNED, Decimal("0.10"))
+    afname = hass.states.get("sensor.dots_energy_afnameprijs_nu")
+    injectie = hass.states.get("sensor.dots_energy_injectieprijs_nu")
+    assert float(afname.state) == round(float(expected.afname), 4)
+    assert float(injectie.state) == round(float(expected.injectie), 4)
+    assert afname.attributes["opslag"] == 0.02
+    assert afname.attributes["opslag_geleerd"] is True
+    assert injectie.attributes["opslag"] == -0.02
+
+
+async def test_unit_price_follows_the_price_entity(hass, aioclient_mock, freezer) -> None:
+    hass.states.async_set(PRICE, "0.10")
+    with patch("custom_components.dots_energy.forecast.fit_params", return_value=LEARNED):
+        entry = await _setup(hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT, OPT_PRIJS: PRICE})
+    before = float(hass.states.get("sensor.dots_energy_injectieprijs_nu").state)
+    hass.states.async_set(PRICE, "0.30")
+    await hass.async_block_till_done()
+    after = float(hass.states.get("sensor.dots_energy_injectieprijs_nu").state)
+    assert round(after - before, 4) == 0.2
+    assert entry.runtime_data.forecast.rules is not None
+
+
+async def test_unit_price_strips_vat_of_the_price_entity(hass, aioclient_mock, freezer) -> None:
+    hass.states.async_set(PRICE, "0.106")
+    await _setup(
+        hass,
+        aioclient_mock,
+        freezer,
+        {OPT_AFNAME: IMPORT, OPT_PRIJS: PRICE, OPT_PRIJS_INCL_BTW: True},
+    )
+    afname = hass.states.get("sensor.dots_energy_afnameprijs_nu")
+    assert afname.attributes["marktprijs"] == 0.1
+
+
+async def test_unit_price_moves_to_the_next_quarter(hass, aioclient_mock, freezer) -> None:
+    with patch("custom_components.dots_energy.forecast.fit_params", return_value=LEARNED):
+        await _setup(hass, aioclient_mock, freezer, {OPT_AFNAME: IMPORT, OPT_PRIJS: PRICE})
+    now = dt_util.utcnow()
+    quarter = now.replace(minute=now.minute - now.minute % 15, second=0, microsecond=0)
+    q = timedelta(minutes=15)
+    raw = [
+        {"start": quarter, "end": quarter + q, "value": 0.10},
+        {"start": quarter + q, "end": quarter + 2 * q, "value": 0.20},
+    ]
+    hass.states.async_set(PRICE, "0.10", {"raw_today": raw})
+    await hass.async_block_till_done()
+    first = float(hass.states.get("sensor.dots_energy_injectieprijs_nu").state)
+    freezer.move_to(quarter + q + timedelta(seconds=1))
+    async_fire_time_changed(hass, quarter + q + timedelta(seconds=1))
+    await hass.async_block_till_done()
+    second = float(hass.states.get("sensor.dots_energy_injectieprijs_nu").state)
+    assert round(second - first, 4) == 0.1

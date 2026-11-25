@@ -12,20 +12,25 @@ from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
+    SensorStateClass,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.event import async_track_state_change_event, async_track_time_change
 
 from . import DotsConfigEntry
 from .categories import Breakdown, categorize_line
+from .const import OPT_PRIJS
 from .coordinator import DotsData
 from .entity import DotsEntity
 from .forecast import DotsForecastCoordinator, ForecastData
 from .kpis import invoice_label, newest_first
 from .models import InvoiceSummary
-from .tariff import Bill
+from .tariff import Bill, UnitPrices
 
 EUR = "EUR"
+EUR_PER_KWH = "EUR/kWh"
+QUARTER_MINUTES = (0, 15, 30, 45)
 
 
 def _num(value: Decimal | None) -> float | None:
@@ -179,6 +184,10 @@ async def async_setup_entry(
     async_add_entities(
         DotsForecastSensor(forecast, description) for description in FORECAST_SENSORS
     )
+    if entry.options.get(OPT_PRIJS):
+        async_add_entities(
+            DotsUnitPriceSensor(forecast, description) for description in UNIT_PRICE_SENSORS
+        )
 
 
 class DotsSensor(DotsEntity, SensorEntity):
@@ -329,3 +338,112 @@ class DotsForecastSensor(DotsEntity, SensorEntity):
         """Breakdown and series."""
         data = self.coordinator.data
         return self.entity_description.attrs_fn(data) if data else {}
+
+
+def _rounded(value: Decimal | None, digits: int) -> float | None:
+    return None if value is None else round(float(value), digits)
+
+
+@dataclass(frozen=True, kw_only=True)
+class DotsUnitPriceSensorDescription(SensorEntityDescription):
+    """Describes a price-per-kWh-now sensor."""
+
+    value_fn: Callable[[UnitPrices], Decimal | None]
+    attrs_fn: Callable[[UnitPrices, DotsForecastCoordinator], dict[str, Any]]
+
+
+def _afname_attrs(p: UnitPrices, c: DotsForecastCoordinator) -> dict[str, Any]:
+    markup = c.params.energy_markup if c.params else None
+    return {
+        "marktprijs": _rounded(p.market, 5),
+        "opslag": _rounded(markup, 4),
+        "opslag_geleerd": markup is not None,
+        "toeslagen": _rounded(p.surcharges_in, 5),
+        "btw": _rounded(c.rules.vat_rate, 4) if c.rules else None,
+    }
+
+
+def _injectie_attrs(p: UnitPrices, c: DotsForecastCoordinator) -> dict[str, Any]:
+    markup = c.params.injection_markup if c.params else None
+    return {
+        "marktprijs": _rounded(p.market, 5),
+        "opslag": _rounded(markup, 4),
+        "opslag_geleerd": markup is not None,
+        "toeslagen": _rounded(p.surcharges_out, 5),
+    }
+
+
+UNIT_PRICE_SENSORS: tuple[DotsUnitPriceSensorDescription, ...] = (
+    DotsUnitPriceSensorDescription(
+        key="afnameprijs_nu",
+        native_unit_of_measurement=EUR_PER_KWH,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=4,
+        value_fn=lambda p: p.afname,
+        attrs_fn=_afname_attrs,
+    ),
+    DotsUnitPriceSensorDescription(
+        key="injectieprijs_nu",
+        native_unit_of_measurement=EUR_PER_KWH,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=4,
+        value_fn=lambda p: p.injectie,
+        attrs_fn=_injectie_attrs,
+    ),
+)
+
+
+class DotsUnitPriceSensor(DotsEntity, SensorEntity):
+    """Price of one kWh now: market price plus what the last invoices add.
+
+    Unknown until the markup on the market price is learned from an invoice month.
+    """
+
+    entity_description: DotsUnitPriceSensorDescription
+
+    def __init__(
+        self, coordinator: DotsForecastCoordinator, description: DotsUnitPriceSensorDescription
+    ) -> None:
+        super().__init__(coordinator, "sensor", description.key)  # type: ignore[arg-type]
+        self.entity_description = description
+
+    @property
+    def _forecast(self) -> DotsForecastCoordinator:
+        return self.coordinator  # type: ignore[return-value]
+
+    async def async_added_to_hass(self) -> None:
+        """Follow the market price: on every change and at every quarter hour."""
+        await super().async_added_to_hass()
+        price_id = self._forecast.config_entry.options[OPT_PRIJS]
+
+        @callback
+        def _price_changed(event: Event[EventStateChangedData]) -> None:
+            self.async_write_ha_state()
+
+        @callback
+        def _quarter(now: datetime) -> None:
+            self.async_write_ha_state()
+
+        self.async_on_remove(async_track_state_change_event(self.hass, price_id, _price_changed))
+        self.async_on_remove(
+            async_track_time_change(self.hass, _quarter, minute=QUARTER_MINUTES, second=1)
+        )
+
+    @property
+    def available(self) -> bool:
+        """Available once tariff rules were derived from the invoices."""
+        return self._forecast.rules is not None
+
+    @property
+    def native_value(self) -> float | None:
+        """EUR per kWh, None while the markup or the market price is unknown."""
+        prices = self._forecast.unit_prices_now()
+        return None if prices is None else _rounded(self.entity_description.value_fn(prices), 4)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Market price, markup and surcharges behind the value."""
+        prices = self._forecast.unit_prices_now()
+        if prices is None:
+            return {}
+        return self.entity_description.attrs_fn(prices, self._forecast)

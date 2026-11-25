@@ -107,6 +107,50 @@ class Bill:
         return amounts
 
 
+@dataclass(frozen=True)
+class UnitPrices:
+    """What one more kWh costs or earns now, from the market price and the last invoices.
+
+    Distribution per kWh is not included: it is billed inside one monthly transport amount.
+    """
+
+    afname: Decimal | None  # import, VAT included; None until the markup is learned
+    injectie: Decimal | None  # export; None until the markup is learned
+    market: Decimal  # market price without VAT
+    surcharges_in: Decimal  # kWh-bound import lines without VAT, markup not included
+    surcharges_out: Decimal  # kWh-bound export charges
+
+
+def unit_prices(rules: TariffRules, params: FitParams, market: Decimal) -> UnitPrices:
+    """Marginal import and export price for a market price (EUR/kWh, without VAT)."""
+    surcharges_in = sum(
+        (
+            (r.rate if r.basis == "kwh_in" else r.rate / 1000)
+            for r in rules.rules
+            if r.basis in ("kwh_in", "mwh_in")
+        ),
+        ZERO,
+    )
+    surcharges_out = sum((r.rate for r in rules.rules if r.basis == "kwh_out"), ZERO)
+    afname = (
+        (market + params.energy_markup + surcharges_in) * (1 + rules.vat_rate)
+        if params.energy_markup is not None
+        else None
+    )
+    injectie = (
+        market + params.injection_markup - surcharges_out
+        if params.injection_markup is not None
+        else None
+    )
+    return UnitPrices(
+        afname=afname,
+        injectie=injectie,
+        market=market,
+        surcharges_in=surcharges_in,
+        surcharges_out=surcharges_out,
+    )
+
+
 def _round(value: Decimal) -> Decimal:
     return value.quantize(CENT, rounding=ROUND_HALF_UP)
 
